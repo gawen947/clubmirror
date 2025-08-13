@@ -1,9 +1,11 @@
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use reqwest::blocking::{Client, Response};
+use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{
     collections::HashMap,
+    fs,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -23,12 +25,12 @@ impl StravaApi {
 
     pub fn refresh_access_token(
         &self,
-        client_id: &str,
+        client_id: u64,
         client_secret: &str,
         refresh_token: &str,
     ) -> Result<TokenResponse> {
         let params = HashMap::from([
-            ("client_id", client_id.to_owned()),
+            ("client_id", client_id.to_string()),
             ("client_secret", client_secret.to_owned()),
             ("refresh_token", refresh_token.to_owned()),
             ("grant_type", "refresh_token".to_owned()),
@@ -64,10 +66,16 @@ impl StravaApi {
         Ok(response)
     }
 
-    pub fn get_group_events(&self, club_id: &str, access_token: &str) -> Result<Vec<Event>> {
+    pub fn get_group_events(&self, club_id: u64, access_token: &str) -> Result<Vec<Event>> {
         let response = self.get(&format!("clubs/{}/group_events", club_id), access_token)?;
-
         Ok(response.json::<Vec<Event>>()?)
+    }
+
+    pub fn get_group_events_from_file(&self, path: &str) -> Result<Vec<Event>> {
+        let json = fs::read_to_string(path)?;
+        let events = serde_json::from_str::<Vec<Event>>(&json)?;
+
+        Ok(events)
     }
 }
 
@@ -77,6 +85,21 @@ where
 {
     let timestamp: u64 = Deserialize::deserialize(deserializer)?;
     Ok(UNIX_EPOCH + Duration::from_secs(timestamp))
+}
+
+fn deserialize_optional_datetime<'de, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: Option<String> = Deserialize::deserialize(deserializer)?;
+
+    match s {
+        None => Ok(None),
+        Some(s) if s.is_empty() => Ok(None),
+        Some(s) => DateTime::parse_from_rfc3339(&s)
+            .map(|dt| Some(dt.with_timezone(&Utc)))
+            .map_err(D::Error::custom),
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -98,13 +121,14 @@ pub struct Event {
     pub club: Club,
     pub organizing_athlete: Athlete,
     pub activity_type: String,
-    pub created_at: DateTime<Utc>,
+    #[serde(deserialize_with = "deserialize_optional_datetime")]
+    pub created_at: Option<DateTime<Utc>>,
     pub route_id: Option<u64>,
     pub route: Option<serde_json::Value>, // null most of the time
     pub women_only: bool,
     pub private: bool,
-    pub skill_levels: u8,
-    pub terrain: u8,
+    pub skill_levels: Option<u8>,
+    pub terrain: Option<u8>,
     pub upcoming_occurrences: Vec<DateTime<Utc>>,
     pub zone: String,
     pub address: String,
@@ -139,8 +163,10 @@ pub struct Athlete {
     pub sex: String,
     pub premium: bool,
     pub summit: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    #[serde(deserialize_with = "deserialize_optional_datetime")]
+    pub created_at: Option<DateTime<Utc>>,
+    #[serde(deserialize_with = "deserialize_optional_datetime")]
+    pub updated_at: Option<DateTime<Utc>>,
     pub badge_type_id: u8,
     pub profile_medium: String,
     pub profile: String,
