@@ -2,13 +2,13 @@ pub mod strava;
 pub use strava::*;
 
 use anyhow::Result;
-use clap::{arg, command, value_parser, ArgAction};
+use clap::{arg, command, ArgAction};
 use log::*;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, Permissions};
 use std::io::Write;
 use std::os::unix::fs::{chown, MetadataExt, PermissionsExt};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::exit;
 use std::time::{Duration, SystemTime};
 use toml;
