@@ -1,5 +1,5 @@
 use crate::Event;
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use log::*;
 use std::{
     fs::{self, Permissions},
@@ -27,7 +27,14 @@ impl Template {
         permissions: u32,
         uid: Option<u32>,
         gid: Option<u32>,
-    ) -> Self {
+    ) -> Result<Self> {
+        // check that path exists
+        ensure!(
+            templates.exists() && templates.is_dir(),
+            "{} does not exist or is not a directory",
+            templates.display()
+        );
+
         let mut context = Context::new();
 
         context.insert("events", events);
@@ -39,14 +46,14 @@ impl Template {
         );
         context.insert("total_events", &events.len());
 
-        Self {
+        Ok(Self {
             templates: templates.to_path_buf(),
             generated: generated.to_path_buf(),
             context,
             permissions,
             uid,
             gid,
-        }
+        })
     }
 
     pub fn generate(&self) -> Result<()> {
@@ -57,14 +64,14 @@ impl Template {
         */
         let pattern = self.templates.join("**/*").to_string_lossy().to_string();
         let tera = Tera::new(&pattern)?;
+        debug!("applying templates in {}", &pattern);
 
         for template in tera.get_template_names() {
-            debug!("rendering {}", template);
             let rendered = tera.render(template, &self.context)?;
 
             let template_relative_path = Path::new(template);
             let template_generated_path = self.generated.join(template_relative_path);
-            debug!("save to {}", template_generated_path.display());
+            debug!("rendering {}", template_generated_path.display());
 
             // create directories in generated path if needed
             if let Some(parent) = template_generated_path.parent() {

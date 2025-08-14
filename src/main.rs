@@ -188,7 +188,7 @@ impl App {
             self.config.generated_permission,
             self.generated_uid,
             self.generated_gid,
-        );
+        )?;
         template.generate()?;
 
         Ok(())
