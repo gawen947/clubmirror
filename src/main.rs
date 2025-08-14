@@ -42,7 +42,8 @@ impl Config {
             "freebsd" => "/usr/local/etc".into(),
             _ => "/etc".into(),
         };
-        config_path.push("lbs-mirror.toml");
+        config_path.push("lbs-mirror");
+        config_path.push("config.toml");
 
         // check file permissions for security
         let metadata = fs::metadata(&config_path)?;
