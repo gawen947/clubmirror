@@ -169,12 +169,27 @@ impl App {
             self.api.get_group_events(club_id, &access_token)?
         };
 
+        // save events JSON if needed
         if self.config.save_events_in_cache {
             let json_string = serde_json::to_string_pretty(&events)?;
             let mut path = self.config.cache_path.clone();
             path.push(format!("club-{}.json", club_id));
             fs::write(path, &json_string)?;
         }
+
+        // generate the template
+        let club_id_str = club_id.to_string();
+        let template_path = self.config.template_path.join(&club_id_str);
+        let generated_path = self.config.generated_site_path.join(&club_id_str);
+        let template = Template::new(
+            &template_path,
+            &generated_path,
+            &events,
+            self.config.generated_permission,
+            self.generated_uid,
+            self.generated_gid,
+        );
+        template.generate()?;
 
         Ok(())
     }
