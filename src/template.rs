@@ -24,6 +24,7 @@ impl Template {
         templates: &Path,
         generated: &Path,
         events: &Vec<Event>,
+        club_id: u64,
         permissions: u32,
         uid: Option<u32>,
         gid: Option<u32>,
@@ -37,6 +38,7 @@ impl Template {
 
         let mut context = Context::new();
 
+        context.insert("club_id", &club_id);
         context.insert("events", events);
         context.insert(
             "generated_at",

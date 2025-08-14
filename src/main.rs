@@ -185,6 +185,7 @@ impl App {
             &template_path,
             &generated_path,
             &events,
+            club_id,
             self.config.generated_permission,
             self.generated_uid,
             self.generated_gid,
