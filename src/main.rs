@@ -1,5 +1,9 @@
 pub mod strava;
+pub mod utils;
 pub use strava::*;
+pub mod template;
+pub use template::*;
+pub use utils::*;
 
 use anyhow::Result;
 use clap::{arg, command, ArgAction};
@@ -15,15 +19,21 @@ use toml;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct Config {
-    client_id: String,
+    client_id: u64,
     client_secret: String, // to obtain authorization codes, might not be needed either
     refresh_token: String,
+
+    save_events_in_cache: bool, // save the parsed and reserialized events in cache for each club
 
     cache_path: PathBuf,
     template_path: PathBuf,
     generated_site_path: PathBuf,
 
-    clubs: Vec<String>, // IDs of the clubs
+    clubs: Vec<u64>, // IDs of the clubs
+
+    generated_permission: u32,
+    generated_user: Option<String>,
+    generated_group: Option<String>,
 }
 
 impl Config {
@@ -54,7 +64,6 @@ impl Config {
 
         let config_str = fs::read_to_string(config_path)?;
         let config_file: Config = toml::from_str(&config_str)?;
-        debug!("config loaded");
 
         Ok(config_file)
     }
@@ -67,8 +76,8 @@ impl Config {
             self.cache_path.display()
         );
         anyhow::ensure!(
-            metadata.mode() & 0o777 == 0o600,
-            "{} is not permission 600",
+            metadata.mode() & 0o777 == 0o700,
+            "{} is not permission 700",
             self.cache_path.display()
         );
         anyhow::ensure!(
@@ -85,15 +94,31 @@ struct App {
     config: Config,
     access_token_path: PathBuf,
     api: StravaApi,
+
+    generated_uid: Option<u32>,
+    generated_gid: Option<u32>,
 }
 
 impl App {
-    fn new(config: Config, api: StravaApi) -> Self {
-        Self {
+    fn new(config: Config, api: StravaApi) -> Result<Self> {
+        let generated_uid = if let Some(user) = &config.generated_user {
+            Some(get_user_by_name_or_uid(user)?.uid())
+        } else {
+            None
+        };
+        let generated_gid = if let Some(group) = &config.generated_group {
+            Some(get_group_by_name_or_gid(group)?.gid())
+        } else {
+            None
+        };
+
+        Ok(Self {
             access_token_path: config.cache_path.clone().join("access_token"),
             config,
             api,
-        }
+            generated_uid,
+            generated_gid,
+        })
     }
 
     fn get_access_token(&self) -> Result<String> {
@@ -110,7 +135,7 @@ impl App {
 
         // refresh token using the API
         let token_response = self.api.refresh_access_token(
-            &self.config.client_id,
+            self.config.client_id,
             &self.config.client_secret,
             &self.config.refresh_token,
         )?;
@@ -130,15 +155,25 @@ impl App {
         Ok(token_response.refresh_token)
     }
 
-    fn process_club(&self, club_id: &str) -> Result<()> {
+    fn process_club(&self, club_id: u64) -> Result<()> {
         info!("processing club {}", club_id);
 
-        let access_token = self.get_access_token()?;
-        let events = self.api.get_group_events(club_id, &access_token)?;
+        // todo: use remote json only when everything works
+        let use_local_json = true;
+        let events = if use_local_json {
+            self.api
+                .get_group_events_from_file("response-events-pretty.json")?
+        } else {
+            let access_token = self.get_access_token()?;
+            self.api.get_group_events(club_id, &access_token)?
+        };
 
-        // save it as club_id.json
-        let json_string = serde_json::to_string_pretty(&events)?;
-        fs::write(&format!("{}-events.json", club_id), &json_string)?;
+        if self.config.save_events_in_cache {
+            let json_string = serde_json::to_string_pretty(&events)?;
+            let mut path = self.config.cache_path.clone();
+            path.push(format!("club-{}.json", club_id));
+            fs::write(path, &json_string)?;
+        }
 
         Ok(())
     }
@@ -184,13 +219,16 @@ fn main() {
     debug!("config loaded");
 
     let api = StravaApi::new();
-    let app = App::new(config, api);
+    let app = App::new(config, api).unwrap_or_else(|e| {
+        error!("Cannot initialize app: {:#}", e);
+        exit(1);
+    });
     debug!("app ready");
 
     // fixme: do that in // but we probably don't need it since we will later have a SPA page
     let mut code = 0;
     for club in &app.config.clubs {
-        app.process_club(club).unwrap_or_else(|e| {
+        app.process_club(*club).unwrap_or_else(|e| {
             warn!("Could not process club {}: {:#}", club, e);
             code = 2;
         });
