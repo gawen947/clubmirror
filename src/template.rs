@@ -1,6 +1,5 @@
 use crate::Event;
 use anyhow::Result;
-use chrono::{DateTime, Utc};
 use log::*;
 use std::{
     fs::{self, Permissions},
