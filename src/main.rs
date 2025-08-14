@@ -32,6 +32,8 @@ struct Config {
 
     clubs: Vec<u64>, // IDs of the clubs
 
+    routes_ttl: u32, // expiry time in seconds for route files (TCX/GPX)
+
     generated_permission: u32,
     generated_user: Option<String>,
     generated_group: Option<String>,
@@ -276,7 +278,7 @@ fn main() {
 
     let api = StravaApi::new();
     let app = App::new(config, api).unwrap_or_else(|e| {
-        error!("Cannot initialize app: {:#}", e);
+        error!("cannot initialize app: {:#}", e);
         exit(1);
     });
     debug!("app ready");
@@ -285,7 +287,7 @@ fn main() {
     let mut code = 0;
     for club in &app.config.clubs {
         app.process_club(*club).unwrap_or_else(|e| {
-            warn!("Could not process club {}: {:#}", club, e);
+            warn!("could not process club {}: {:#}", club, e);
             code = 2;
         });
     }
