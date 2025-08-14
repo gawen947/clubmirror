@@ -1,5 +1,6 @@
 pub mod strava;
 pub mod utils;
+use chrono::{DateTime, Utc};
 pub use strava::*;
 pub mod template;
 pub use template::*;
@@ -14,7 +15,7 @@ use std::io::Write;
 use std::os::unix::fs::{chown, MetadataExt, PermissionsExt};
 use std::path::PathBuf;
 use std::process::exit;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 use toml;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -34,6 +35,8 @@ struct Config {
     generated_permission: u32,
     generated_user: Option<String>,
     generated_group: Option<String>,
+    generated_past_days: Option<u32>, // show events up to x days in the past
+    generated_future_days: Option<u32>, // show events up to x days in the future
 }
 
 impl Config {
@@ -123,7 +126,7 @@ impl App {
     }
 
     fn get_access_token(&self) -> Result<String> {
-        let threshold = SystemTime::now() + Duration::from_secs(8);
+        let threshold = SystemTime::now() + std::time::Duration::from_secs(8);
         let should_refresh = match fs::metadata(&self.access_token_path) {
             Err(_) => true,
             Ok(metadata) => metadata.modified()? < threshold,
@@ -156,6 +159,35 @@ impl App {
         Ok(token_response.refresh_token)
     }
 
+    /// filter predicate for events that are too far in the past or the future
+    fn event_filter(&self, now: &DateTime<Utc>, event: &Event) -> bool {
+        let created_at = event.created_at;
+        let occurences = &event.upcoming_occurrences;
+
+        let occurence_min = occurences.iter().min().copied();
+        let occurence_max = occurences.iter().max().copied();
+
+        if let Some(past_days) = self.config.generated_past_days {
+            let past = now.clone() - chrono::Duration::days(past_days as i64);
+
+            if let Some(occurence_max) = occurence_max {
+                return occurence_max > past;
+            } else if let Some(created_at) = created_at {
+                return created_at > past;
+            }
+        }
+
+        if let Some(future_days) = self.config.generated_future_days {
+            let future = now.clone() + chrono::Duration::days(future_days as i64);
+
+            if let Some(occurence_min) = occurence_min {
+                return occurence_min < future;
+            }
+        }
+
+        true
+    }
+
     fn process_club(&self, club_id: u64) -> Result<()> {
         info!("processing club {}", club_id);
 
@@ -168,6 +200,13 @@ impl App {
             let access_token = self.get_access_token()?;
             self.api.get_group_events(club_id, &access_token)?
         };
+
+        // filter events based on time
+        let now = Utc::now();
+        let events = events
+            .into_iter()
+            .filter(|event| self.event_filter(&now, event))
+            .collect();
 
         // save events JSON if needed
         if self.config.save_events_in_cache {
