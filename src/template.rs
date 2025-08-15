@@ -23,6 +23,7 @@ impl Template {
     pub fn new(
         templates: &Path,
         generated: &Path,
+        route_url: &str,
         events: &Vec<Event>,
         club_id: u64,
         permissions: u32,
@@ -40,6 +41,7 @@ impl Template {
 
         context.insert("club_id", &club_id);
         context.insert("events", events);
+        context.insert("routes_url", route_url);
         context.insert(
             "generated_at",
             &chrono::Utc::now()

@@ -34,6 +34,7 @@ pub struct Config {
     template_path: PathBuf,
     generated_site_path: PathBuf,
     downloaded_routes: PathBuf,
+    routes_url: String, // provided to the templates to download the routes TCX/GPX
 
     clubs: Vec<u64>, // IDs of the clubs
 
@@ -254,6 +255,7 @@ impl App {
         let template = Template::new(
             &template_path,
             &generated_path,
+            &self.config.routes_url,
             &events,
             club_id,
             self.config.generated_permission,
