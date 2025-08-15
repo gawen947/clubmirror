@@ -9,6 +9,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+static BASE_URL: &str = "https://www.strave.con";
 static TOKEN_URL: &str = "https://www.strava.com/oauth/token";
 static API_URL: &str = "https://www.strava.com/api/v3";
 
@@ -71,11 +72,46 @@ impl StravaApi {
         Ok(response.json::<Vec<Event>>()?)
     }
 
+    /// Get the group events from a JSON file (only here for debug purposes)
     pub fn get_group_events_from_file(&self, path: &str) -> Result<Vec<Event>> {
         let json = fs::read_to_string(path)?;
         let events = serde_json::from_str::<Vec<Event>>(&json)?;
 
         Ok(events)
+    }
+
+    /// Download a route
+    pub fn get_route(
+        &self,
+        route_id: u64,
+        trace_type: TraceType,
+        access_token: &str,
+    ) -> Result<Response> {
+        let trace_type_url = match trace_type {
+            TraceType::Tcx => "export_tcx",
+            TraceType::Gpx => "export_gpx",
+        };
+
+        let url = format!(
+            "{}/{}/{}",
+            "https://www.strava.com/routes/", route_id, trace_type_url
+        );
+
+        let response = self
+            .client
+            .get(url)
+            .header("Authorization", format!("Bearer {}", access_token))
+            .send()?;
+
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "API call failed: {} {}",
+                response.status().as_u16(),
+                response.status().canonical_reason().unwrap()
+            ));
+        }
+
+        Ok(response)
     }
 }
 
@@ -174,4 +210,9 @@ pub struct Athlete {
     pub follower: Option<serde_json::Value>, // null most of the time
     pub blocked: bool,
     pub can_follow: bool,
+}
+
+pub enum TraceType {
+    Tcx,
+    Gpx,
 }

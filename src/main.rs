@@ -1,3 +1,4 @@
+pub mod routes;
 pub mod strava;
 pub mod utils;
 use chrono::{DateTime, Utc};
@@ -16,10 +17,13 @@ use std::os::unix::fs::{chown, MetadataExt, PermissionsExt};
 use std::path::PathBuf;
 use std::process::exit;
 use std::time::SystemTime;
+use std::rc::Rc;
 use toml;
 
+use crate::routes::RoutesStore;
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
-struct Config {
+pub struct Config {
     client_id: u64,
     client_secret: String, // to obtain authorization codes, might not be needed either
     refresh_token: String,
@@ -29,10 +33,11 @@ struct Config {
     cache_path: PathBuf,
     template_path: PathBuf,
     generated_site_path: PathBuf,
+    downloaded_routes: PathBuf,
 
     clubs: Vec<u64>, // IDs of the clubs
 
-    routes_ttl: u32, // expiry time in seconds for route files (TCX/GPX)
+    routes_ttl: u64, // expiry time in seconds for route files (TCX/GPX)
 
     generated_permission: u32,
     generated_user: Option<String>,
@@ -97,9 +102,10 @@ impl Config {
 }
 
 struct App {
-    config: Config,
+    config: Rc<Config>,
     access_token_path: PathBuf,
-    api: StravaApi,
+    routes: RoutesStore,
+    api: Rc<StravaApi>,
 
     generated_uid: Option<u32>,
     generated_gid: Option<u32>,
@@ -118,10 +124,23 @@ impl App {
             None
         };
 
+        let config = Rc::new(config);
+        let api = Rc::new(api);
+
+        let routes = RoutesStore {
+            config: Rc::clone(&config),
+            api: Rc::clone(&api),
+            ttl: config.routes_ttl,
+            generated_permission: config.generated_permission,
+            generated_uid,
+            generated_gid,
+        };
+
         Ok(Self {
             access_token_path: config.cache_path.clone().join("access_token"),
             config,
             api,
+            routes,
             generated_uid,
             generated_gid,
         })
@@ -193,19 +212,19 @@ impl App {
     fn process_club(&self, club_id: u64) -> Result<()> {
         info!("processing club {}", club_id);
 
+        let access_token = self.get_access_token()?;
         // todo: use remote json only when everything works
         let use_local_json = true;
         let events = if use_local_json {
             self.api
                 .get_group_events_from_file("response-events-pretty.json")?
         } else {
-            let access_token = self.get_access_token()?;
             self.api.get_group_events(club_id, &access_token)?
         };
 
         // filter events based on time
         let now = Utc::now();
-        let events = events
+        let events: Vec<Event> = events
             .into_iter()
             .filter(|event| self.event_filter(&now, event))
             .collect();
@@ -216,6 +235,16 @@ impl App {
             let mut path = self.config.cache_path.clone();
             path.push(format!("club-{}.json", club_id));
             fs::write(path, &json_string)?;
+        }
+
+        // download routes if needed
+        for event in events.iter() {
+            if let Some(route_id) = event.route_id {
+                self.routes
+                    .get_route(route_id, TraceType::Tcx, &access_token)?;
+                self.routes
+                    .get_route(route_id, TraceType::Gpx, &access_token)?;
+            }
         }
 
         // generate the template
