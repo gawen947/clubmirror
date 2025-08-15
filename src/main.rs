@@ -16,8 +16,8 @@ use std::io::Write;
 use std::os::unix::fs::{chown, MetadataExt, PermissionsExt};
 use std::path::PathBuf;
 use std::process::exit;
-use std::time::SystemTime;
 use std::rc::Rc;
+use std::time::SystemTime;
 use toml;
 
 use crate::routes::RoutesStore;
@@ -131,9 +131,9 @@ impl App {
             config: Rc::clone(&config),
             api: Rc::clone(&api),
             ttl: config.routes_ttl,
-            generated_permission: config.generated_permission,
-            generated_uid,
-            generated_gid,
+            permissions: config.generated_permission,
+            uid: generated_uid,
+            gid: generated_gid,
         };
 
         Ok(Self {

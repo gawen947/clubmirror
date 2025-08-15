@@ -9,7 +9,6 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-static BASE_URL: &str = "https://www.strave.con";
 static TOKEN_URL: &str = "https://www.strava.com/oauth/token";
 static API_URL: &str = "https://www.strava.com/api/v3";
 
@@ -92,10 +91,7 @@ impl StravaApi {
             TraceType::Gpx => "export_gpx",
         };
 
-        let url = format!(
-            "{}/{}/{}",
-            "https://www.strava.com/routes/", route_id, trace_type_url
-        );
+        let url = format!("{}/routes/{}/{}", API_URL, route_id, trace_type_url);
 
         let response = self
             .client

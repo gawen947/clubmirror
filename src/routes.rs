@@ -1,6 +1,8 @@
 use anyhow::Result;
 use std::{
+    fs::Permissions,
     io::Write,
+    os::unix::fs::{chown, PermissionsExt},
     rc::Rc,
     time::{Duration, SystemTime},
 };
@@ -13,9 +15,9 @@ pub struct RoutesStore {
     pub config: Rc<Config>,
     pub ttl: u64,
     pub api: Rc<StravaApi>,
-    pub generated_permission: u32,
-    pub generated_uid: Option<u32>,
-    pub generated_gid: Option<u32>,
+    pub permissions: u32,
+    pub uid: Option<u32>,
+    pub gid: Option<u32>,
 }
 
 impl RoutesStore {
@@ -49,9 +51,12 @@ impl RoutesStore {
             debug!("downloading route {}", path.display());
             let response = self.api.get_route(route_id, trace_type, access_token)?;
 
-            let mut file = std::fs::File::create(path)?;
+            let mut file = std::fs::File::create(&path)?;
             file.write_all(&response.bytes()?)?;
+            file.set_permissions(Permissions::from_mode(self.permissions))?;
             file.set_modified(now + Duration::from_secs(self.ttl))?;
+            drop(file);
+            chown(&path, self.uid, self.gid)?;
         }
 
         Ok(())
