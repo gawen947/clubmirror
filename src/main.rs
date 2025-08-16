@@ -31,6 +31,7 @@ pub struct Config {
     client_id: u64,
     client_secret: String,
     refresh_token: String,
+    warn_on_404: Option<bool>, // warn on 404 error from the API instead of failing
 
     cache_path: PathBuf,
     template_path: PathBuf,
@@ -331,7 +332,7 @@ fn main() {
     });
     debug!("config loaded");
 
-    let api = StravaApi::new();
+    let api = StravaApi::new(config.warn_on_404.unwrap_or(false));
     let app = App::new(config, api).unwrap_or_else(|e| {
         error!("cannot initialize app: {:#}", e);
         exit(1);

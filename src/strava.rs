@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
+use log::*;
 use reqwest::blocking::{Client, Response};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -15,12 +16,14 @@ static API_URL: &str = "https://www.strava.com/api/v3";
 
 pub struct StravaApi {
     client: Client,
+    warn_on_404: bool,
 }
 
 impl StravaApi {
-    pub fn new() -> Self {
+    pub fn new(warn_on_404: bool) -> Self {
         Self {
             client: Client::new(),
+            warn_on_404,
         }
     }
 
@@ -52,16 +55,22 @@ impl StravaApi {
 
         let response = self
             .client
-            .get(url)
+            .get(&url)
             .header("Authorization", format!("Bearer {}", access_token))
             .send()?;
 
         if !response.status().is_success() {
-            return Err(anyhow!(
-                "API call failed: {} {}",
-                response.status().as_u16(),
-                response.status().canonical_reason().unwrap()
-            ));
+            let status_code = response.status().as_u16();
+
+            if self.warn_on_404 && status_code == 404 {
+                warn!("got a 404 for {}", &url);
+            } else {
+                return Err(anyhow!(
+                    "API call failed: {} {}",
+                    response.status().as_u16(),
+                    response.status().canonical_reason().unwrap()
+                ));
+            }
         }
 
         Ok(response)
