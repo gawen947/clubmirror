@@ -182,7 +182,7 @@ impl App {
         drop(file);
         chown(&self.access_token_path, Some(0), Some(0))?;
 
-        Ok(token_response.refresh_token)
+        Ok(token_response.access_token)
     }
 
     /// filter predicate for events that are too far in the past or the future
