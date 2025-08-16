@@ -28,35 +28,34 @@ impl RoutesStore {
         trace_type: TraceType,
         access_token: &str,
     ) -> Result<()> {
-        let now = SystemTime::now();
+        if let Some(downloaded_routes) = &self.config.downloaded_routes {
+            let now = SystemTime::now();
 
-        let extension = match trace_type {
-            TraceType::Tcx => "tcx",
-            TraceType::Gpx => "gpx",
-        };
+            let extension = match trace_type {
+                TraceType::Tcx => "tcx",
+                TraceType::Gpx => "gpx",
+            };
 
-        let path = self
-            .config
-            .downloaded_routes
-            .join(format!("{}.{}", route_id, extension));
+            let path = downloaded_routes.join(format!("{}.{}", route_id, extension));
 
-        let is_expired = if !path.exists() {
-            true
-        } else {
-            let mtime = std::fs::metadata(&path)?.modified()?;
-            mtime < now
-        };
+            let is_expired = if !path.exists() {
+                true
+            } else {
+                let mtime = std::fs::metadata(&path)?.modified()?;
+                mtime < now
+            };
 
-        if is_expired {
-            debug!("downloading route {}", path.display());
-            let response = self.api.get_route(route_id, trace_type, access_token)?;
+            if is_expired {
+                debug!("downloading route {}", path.display());
+                let response = self.api.get_route(route_id, trace_type, access_token)?;
 
-            let mut file = std::fs::File::create(&path)?;
-            file.write_all(&response.bytes()?)?;
-            file.set_permissions(Permissions::from_mode(self.permissions))?;
-            file.set_modified(now + Duration::from_secs(self.ttl))?;
-            drop(file);
-            chown(&path, self.uid, self.gid)?;
+                let mut file = std::fs::File::create(&path)?;
+                file.write_all(&response.bytes()?)?;
+                file.set_permissions(Permissions::from_mode(self.permissions))?;
+                file.set_modified(now + Duration::from_secs(self.ttl))?;
+                drop(file);
+                chown(&path, self.uid, self.gid)?;
+            }
         }
 
         Ok(())

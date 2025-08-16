@@ -36,10 +36,10 @@ pub struct Config {
     cache_path: PathBuf,
     template_path: PathBuf,
     generated_site_path: PathBuf,
-    downloaded_routes: PathBuf,
-    calendars_path: Option<PathBuf>,
-    routes_url: String, // provided to the templates to download the routes TCX/GPX
-    calendars_url: Option<String>, // provided to the templates to download the calendars
+    downloaded_routes: Option<PathBuf>, // try to download the TCX/GPX from strava
+    calendars_path: Option<PathBuf>,    // create an ICS calendar from all events
+    routes_url: String,                 // provided to the templates to download the routes TCX/GPX
+    calendars_url: Option<String>,      // provided to the templates to download the calendars
 
     clubs: Vec<u64>, // IDs of the clubs
 
