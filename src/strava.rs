@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use reqwest::blocking::{Client, Response};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::path::Path;
 use std::{
     collections::HashMap,
     fs,
@@ -72,7 +73,7 @@ impl StravaApi {
     }
 
     /// Get the group events from a JSON file (only here for debug purposes)
-    pub fn get_group_events_from_file(&self, path: &str) -> Result<Vec<Event>> {
+    pub fn get_group_events_from_file(&self, path: &Path) -> Result<Vec<Event>> {
         let json = fs::read_to_string(path)?;
         let events = serde_json::from_str::<Vec<Event>>(&json)?;
 

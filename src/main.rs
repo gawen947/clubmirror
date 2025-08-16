@@ -216,11 +216,9 @@ impl App {
         info!("processing club {}", club_id);
 
         let access_token = self.get_access_token()?;
-        // todo: use remote json only when everything works
-        let use_local_json = false;
-        let events = if use_local_json {
-            self.api
-                .get_group_events_from_file("response-events-pretty.json")?
+
+        let events = if let Some(local_json_path) = &self.config.quirk_local_json {
+            self.api.get_group_events_from_file(local_json_path)?
         } else {
             self.api.get_group_events(club_id, &access_token)?
         };
