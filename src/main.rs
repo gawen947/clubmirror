@@ -21,6 +21,7 @@ use std::rc::Rc;
 use std::time::SystemTime;
 use toml;
 
+use crate::quirk::quirk_bkn_early_ride;
 use crate::routes::RoutesStore;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -218,11 +219,16 @@ impl App {
 
         let access_token = self.get_access_token()?;
 
-        let events = if let Some(local_json_path) = &self.config.quirk_local_json {
+        let mut events = if let Some(local_json_path) = &self.config.quirk_local_json {
             self.api.get_group_events_from_file(local_json_path)?
         } else {
             self.api.get_group_events(club_id, &access_token)?
         };
+
+        // apply the BKN early ride quirk if needed
+        if self.config.quirk_bkn_early_ride.unwrap_or(false) {
+            events = quirk_bkn_early_ride(events);
+        }
 
         // filter events based on time
         let now = Utc::now();

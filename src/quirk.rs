@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 
 use crate::{get_next_tuesday_6am_brussels, Event};
 
-pub fn quirk_bkn_early_ride(mut events: Vec<Event>) {
+pub fn quirk_bkn_early_ride(mut events: Vec<Event>) -> Vec<Event> {
     // find latest EARLY RIDE
     let latest_early_ride = events
         .iter()
@@ -23,4 +23,6 @@ pub fn quirk_bkn_early_ride(mut events: Vec<Event>) {
         new_early_ride.upcoming_occurrences = vec![next_tuesday];
         events.push(new_early_ride);
     }
+
+    events
 }
