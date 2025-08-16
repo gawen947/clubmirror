@@ -91,23 +91,10 @@ impl StravaApi {
             TraceType::Tcx => "export_tcx",
             TraceType::Gpx => "export_gpx",
         };
-
-        let url = format!("{}/routes/{}/{}", API_URL, route_id, trace_type_url);
-
-        let response = self
-            .client
-            .get(url)
-            .header("Authorization", format!("Bearer {}", access_token))
-            .send()?;
-
-        if !response.status().is_success() {
-            return Err(anyhow!(
-                "API call failed: {} {}",
-                response.status().as_u16(),
-                response.status().canonical_reason().unwrap()
-            ));
-        }
-
+        let response = self.get(
+            &format!("routes/{}/{}", route_id, trace_type_url),
+            access_token,
+        )?;
         Ok(response)
     }
 }
