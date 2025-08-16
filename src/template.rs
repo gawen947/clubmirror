@@ -24,6 +24,7 @@ impl Template {
         templates: &Path,
         generated: &Path,
         route_url: &str,
+        calendar_url: Option<&str>,
         events: &Vec<Event>,
         club_id: u64,
         permissions: u32,
@@ -42,6 +43,9 @@ impl Template {
         context.insert("club_id", &club_id);
         context.insert("events", events);
         context.insert("routes_url", route_url);
+        if let Some(calendar_url) = calendar_url {
+            context.insert("calendar_url", calendar_url);
+        }
         context.insert(
             "generated_at",
             &chrono::Utc::now()

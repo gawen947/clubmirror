@@ -1,3 +1,4 @@
+pub mod calendar;
 pub mod quirk;
 pub mod routes;
 pub mod strava;
@@ -21,20 +22,23 @@ use std::rc::Rc;
 use std::time::SystemTime;
 use toml;
 
+use crate::calendar::save_calendar;
 use crate::quirk::quirk_bkn_early_ride;
 use crate::routes::RoutesStore;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     client_id: u64,
-    client_secret: String, // to obtain authorization codes, might not be needed either
+    client_secret: String,
     refresh_token: String,
 
     cache_path: PathBuf,
     template_path: PathBuf,
     generated_site_path: PathBuf,
     downloaded_routes: PathBuf,
+    calendars_path: Option<PathBuf>,
     routes_url: String, // provided to the templates to download the routes TCX/GPX
+    calendars_url: Option<String>, // provided to the templates to download the calendars
 
     clubs: Vec<u64>, // IDs of the clubs
 
@@ -230,12 +234,19 @@ impl App {
             events = quirk_bkn_early_ride(events);
         }
 
+        // save the calendar if needed
+        if let Some(calendars_path) = &self.config.calendars_path {
+            save_calendar(&events, &calendars_path.join(&format!("{}.ics", club_id)))?;
+        }
+
         // filter events based on time
         let now = Utc::now();
         let events: Vec<Event> = events
             .into_iter()
             .filter(|event| self.event_filter(&now, event))
             .collect();
+
+        // todo: short the events
 
         // save events JSON if needed
         if let Some(json_destination_path) = &self.config.quirk_save_json {
@@ -264,6 +275,7 @@ impl App {
             &template_path,
             &generated_path,
             &self.config.routes_url,
+            self.config.calendars_url.as_deref(),
             &events,
             club_id,
             self.config.generated_permission,
