@@ -28,8 +28,6 @@ pub struct Config {
     client_secret: String, // to obtain authorization codes, might not be needed either
     refresh_token: String,
 
-    save_events_in_cache: bool, // save the parsed and reserialized events in cache for each club
-
     cache_path: PathBuf,
     template_path: PathBuf,
     generated_site_path: PathBuf,
@@ -45,6 +43,10 @@ pub struct Config {
     generated_group: Option<String>,
     generated_past_days: Option<u32>, // show events up to x days in the past
     generated_future_days: Option<u32>, // show events up to x days in the future
+
+    quirk_save_json: Option<PathBuf>, // save the resulting JSON for each clubs in the given path
+    quirk_local_json: Option<PathBuf>, // use the given JSON instead of asking the API (avoid spamming it)
+    quirk_bkn_early_ride: Option<bool>, // report the latest early ride of the JSON to next tuesday
 }
 
 impl Config {
@@ -215,7 +217,7 @@ impl App {
 
         let access_token = self.get_access_token()?;
         // todo: use remote json only when everything works
-        let use_local_json = true;
+        let use_local_json = false;
         let events = if use_local_json {
             self.api
                 .get_group_events_from_file("response-events-pretty.json")?
@@ -231,11 +233,12 @@ impl App {
             .collect();
 
         // save events JSON if needed
-        if self.config.save_events_in_cache {
+        if let Some(json_destination_path) = &self.config.quirk_save_json {
             let json_string = serde_json::to_string_pretty(&events)?;
-            let mut path = self.config.cache_path.clone();
-            path.push(format!("club-{}.json", club_id));
-            fs::write(path, &json_string)?;
+            fs::write(
+                json_destination_path.join(format!("{}.json", club_id)),
+                &json_string,
+            )?;
         }
 
         // download routes if needed
