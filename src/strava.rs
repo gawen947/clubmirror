@@ -131,7 +131,7 @@ pub struct TokenResponse {
     pub expires_at: SystemTime,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Event {
     pub id: u64,
     pub resource_state: u8,
@@ -156,20 +156,20 @@ pub struct Event {
     pub start_latlng: Option<LatLng>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LatLng {
     pub latitude: f64,
     pub longitude: f64,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Club {
     pub id: u64,
     pub resource_state: u8,
     pub name: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Athlete {
     pub id: u64,
     pub username: Option<String>,

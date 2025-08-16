@@ -1,3 +1,4 @@
+pub mod quirk;
 pub mod routes;
 pub mod strava;
 pub mod utils;
