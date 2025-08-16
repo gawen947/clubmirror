@@ -23,7 +23,7 @@ use std::time::SystemTime;
 use toml;
 
 use crate::calendar::save_calendar;
-use crate::quirk::quirk_bkn_early_ride;
+use crate::quirk::{quirk_bkn_early_ride, quirk_sort_events};
 use crate::routes::RoutesStore;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -53,6 +53,7 @@ pub struct Config {
     quirk_save_json: Option<PathBuf>, // save the resulting JSON for each clubs in the given path
     quirk_local_json: Option<PathBuf>, // use the given JSON instead of asking the API (avoid spamming it)
     quirk_bkn_early_ride: Option<bool>, // report the latest early ride of the JSON to next tuesday
+    quirk_sort_events: Option<bool>,   // sort the events after filter (useful if rescheduled)
 }
 
 impl Config {
@@ -241,12 +242,15 @@ impl App {
 
         // filter events based on time
         let now = Utc::now();
-        let events: Vec<Event> = events
+        let mut events: Vec<Event> = events
             .into_iter()
             .filter(|event| self.event_filter(&now, event))
             .collect();
 
-        // todo: short the events
+        // sort events if needed
+        if self.config.quirk_sort_events.unwrap_or(false) {
+            events = quirk_sort_events(events);
+        }
 
         // save events JSON if needed
         if let Some(json_destination_path) = &self.config.quirk_save_json {
