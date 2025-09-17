@@ -4,7 +4,11 @@ use log::*;
 use crate::{get_next_tuesday_6am_brussels, Event};
 
 /// Map the latest EARLY RIDE to next tuesday 6AM
-pub fn quirk_bkn_early_ride(mut events: Vec<Event>) -> Vec<Event> {
+pub fn quirk_bkn_early_ride(
+    mut events: Vec<Event>,
+    start: &Option<DateTime<Utc>>,
+    end: &Option<DateTime<Utc>>,
+) -> Vec<Event> {
     // find latest EARLY RIDE
     let latest_early_ride = events
         .iter()
@@ -22,9 +26,20 @@ pub fn quirk_bkn_early_ride(mut events: Vec<Event>) -> Vec<Event> {
         debug!("applying quirk_bkn_early_ride");
         let next_tuesday = get_next_tuesday_6am_brussels(&Utc::now());
 
-        let mut new_early_ride = event.clone();
-        new_early_ride.upcoming_occurrences = vec![next_tuesday];
-        events.push(new_early_ride);
+        // skip if outside boundaries
+        let mut skip: bool = false;
+        if let Some(start) = start {
+            skip = skip || next_tuesday < *start;
+        }
+        if let Some(end) = end {
+            skip = skip || next_tuesday > *end;
+        }
+
+        if !skip {
+            let mut new_early_ride = event.clone();
+            new_early_ride.upcoming_occurrences = vec![next_tuesday];
+            events.push(new_early_ride);
+        }
     }
 
     events

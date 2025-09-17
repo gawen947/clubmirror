@@ -54,6 +54,8 @@ pub struct Config {
     quirk_save_json: Option<PathBuf>, // save the resulting JSON for each clubs in the given path
     quirk_local_json: Option<PathBuf>, // use the given JSON instead of asking the API (avoid spamming it)
     quirk_bkn_early_ride: Option<bool>, // report the latest early ride of the JSON to next tuesday
+    quirk_bkn_early_ride_start: Option<DateTime<Utc>>, // no early ride quirk before this date
+    quirk_bkn_early_ride_end: Option<DateTime<Utc>>, // no early ride quirk after this date
     quirk_sort_events: Option<bool>,   // sort the events after filter (useful if rescheduled)
 }
 
@@ -233,7 +235,11 @@ impl App {
 
         // apply the BKN early ride quirk if needed
         if self.config.quirk_bkn_early_ride.unwrap_or(false) {
-            events = quirk_bkn_early_ride(events);
+            events = quirk_bkn_early_ride(
+                events,
+                &self.config.quirk_bkn_early_ride_start,
+                &self.config.quirk_bkn_early_ride_end,
+            );
         }
 
         // save the calendar if needed
