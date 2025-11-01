@@ -67,8 +67,8 @@ impl StravaApi {
             } else {
                 return Err(anyhow!(
                     "API call failed: {} {}",
-                    response.status().as_u16(),
-                    response.status().canonical_reason().unwrap()
+                    status_code,
+                    response.status().canonical_reason().unwrap_or("(unknown)")
                 ));
             }
         }
