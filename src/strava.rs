@@ -5,6 +5,7 @@ use reqwest::blocking::{Client, Response};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::path::Path;
+use std::path::PathBuf;
 use std::{
     collections::HashMap,
     fs,
@@ -17,13 +18,15 @@ static API_URL: &str = "https://www.strava.com/api/v3";
 pub struct StravaApi {
     client: Client,
     warn_on_404: bool,
+    log_response_path: Option<PathBuf>,
 }
 
 impl StravaApi {
-    pub fn new(warn_on_404: bool) -> Self {
+    pub fn new(warn_on_404: bool, log_response_path: Option<PathBuf>) -> Self {
         Self {
             client: Client::new(),
             warn_on_404,
+            log_response_path
         }
     }
 
@@ -77,8 +80,14 @@ impl StravaApi {
     }
 
     pub fn get_group_events(&self, club_id: u64, access_token: &str) -> Result<Vec<Event>> {
-        let response = self.get(&format!("clubs/{}/group_events", club_id), access_token)?;
-        Ok(response.json::<Vec<Event>>()?)
+        // parse response as text because we might have to save is (and we cannot clone a response)
+        let response = self.get(&format!("clubs/{}/group_events", club_id), access_token)?.text()?;
+
+        if let Some(log_response_path) = &self.log_response_path {
+            std::fs::write(&log_response_path, &response)?;
+        }
+
+        Ok(serde_json::from_str(&response)?)
     }
 
     /// Get the group events from a JSON file (only here for debug purposes)

@@ -36,6 +36,7 @@ pub struct Config {
     cache_path: PathBuf,
     template_path: PathBuf,
     generated_site_path: PathBuf,
+    log_response_path: Option<PathBuf>, // save strava response in the following path for debugging
     downloaded_routes: Option<PathBuf>, // try to download the TCX/GPX from strava
     calendars_path: Option<PathBuf>,    // create an ICS calendar from all events
     routes_url: String,                 // provided to the templates to download the routes TCX/GPX
@@ -338,7 +339,7 @@ fn main() {
     });
     debug!("config loaded");
 
-    let api = StravaApi::new(config.warn_on_404.unwrap_or(false));
+    let api = StravaApi::new(config.warn_on_404.unwrap_or(false), config.log_response_path.clone());
     let app = App::new(config, api).unwrap_or_else(|e| {
         error!("cannot initialize app: {:#}", e);
         exit(1);
