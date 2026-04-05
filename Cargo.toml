@@ -1,11 +1,12 @@
 [package]
 name = "lbs-mirror"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 
 [profile.release]
 strip = true
 lto = true
+panic = "abort"
 
 [dependencies]
 anyhow = "1.0.98"
