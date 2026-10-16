@@ -194,24 +194,25 @@ pub struct Athlete {
     pub resource_state: u8,
     pub firstname: String,
     pub lastname: String,
-    pub bio: String,
-    pub city: String,
-    pub state: String,
+    // everything below can be null or missing depending on the athlete's privacy settings
+    pub bio: Option<String>,
+    pub city: Option<String>,
+    pub state: Option<String>,
     pub country: Option<String>,
-    pub sex: String,
-    pub premium: bool,
-    pub summit: bool,
-    #[serde(deserialize_with = "deserialize_optional_datetime")]
+    pub sex: Option<String>,
+    pub premium: Option<bool>,
+    pub summit: Option<bool>,
+    #[serde(default, deserialize_with = "deserialize_optional_datetime")]
     pub created_at: Option<DateTime<Utc>>,
-    #[serde(deserialize_with = "deserialize_optional_datetime")]
+    #[serde(default, deserialize_with = "deserialize_optional_datetime")]
     pub updated_at: Option<DateTime<Utc>>,
-    pub badge_type_id: u8,
-    pub profile_medium: String,
-    pub profile: String,
+    pub badge_type_id: Option<u8>,
+    pub profile_medium: Option<String>,
+    pub profile: Option<String>,
     pub friend: Option<serde_json::Value>, // null most of the time
     pub follower: Option<serde_json::Value>, // null most of the time
-    pub blocked: bool,
-    pub can_follow: bool,
+    pub blocked: Option<bool>,
+    pub can_follow: Option<bool>,
 }
 
 pub enum TraceType {
