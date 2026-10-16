@@ -23,7 +23,7 @@ use std::time::SystemTime;
 use toml;
 
 use crate::calendar::save_calendar;
-use crate::quirk::{quirk_bkn_early_ride, quirk_sort_events};
+use crate::quirk::quirk_sort_events;
 use crate::routes::RoutesStore;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -54,9 +54,6 @@ pub struct Config {
 
     quirk_save_json: Option<PathBuf>, // save the resulting JSON for each clubs in the given path
     quirk_local_json: Option<PathBuf>, // use the given JSON instead of asking the API (avoid spamming it)
-    quirk_bkn_early_ride: Option<bool>, // report the latest early ride of the JSON to next tuesday
-    quirk_bkn_early_ride_start: Option<DateTime<Utc>>, // no early ride quirk before this date
-    quirk_bkn_early_ride_end: Option<DateTime<Utc>>, // no early ride quirk after this date
     quirk_sort_events: Option<bool>,   // sort the events after filter (useful if rescheduled)
 }
 
@@ -234,20 +231,11 @@ impl App {
 
         let access_token = self.get_access_token()?;
 
-        let mut events = if let Some(local_json_path) = &self.config.quirk_local_json {
+        let events = if let Some(local_json_path) = &self.config.quirk_local_json {
             self.api.get_group_events_from_file(local_json_path)?
         } else {
             self.api.get_group_events(club_id, &access_token)?
         };
-
-        // apply the BKN early ride quirk if needed
-        if self.config.quirk_bkn_early_ride.unwrap_or(false) {
-            events = quirk_bkn_early_ride(
-                events,
-                &self.config.quirk_bkn_early_ride_start,
-                &self.config.quirk_bkn_early_ride_end,
-            );
-        }
 
         // save the calendar if needed
         if let Some(calendars_path) = &self.config.calendars_path {
