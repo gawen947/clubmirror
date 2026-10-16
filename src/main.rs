@@ -14,7 +14,6 @@ use clap::{arg, command, ArgAction};
 use log::*;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, Permissions};
-use std::io::Write;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -119,9 +118,18 @@ impl Config {
     }
 }
 
+/// Rotated refresh token, kept in the cache directory. `origin` is the refresh token of the
+/// config file it was derived from: if the config changes, the cached token is stale.
+#[derive(Serialize, Deserialize)]
+struct StoredRefreshToken {
+    origin: String,
+    current: String,
+}
+
 struct App {
     config: Rc<Config>,
     access_token_path: PathBuf,
+    refresh_token_path: PathBuf,
     routes: RoutesStore,
     api: Rc<StravaApi>,
 
@@ -156,12 +164,24 @@ impl App {
 
         Ok(Self {
             access_token_path: config.cache_path.clone().join("access_token"),
+            refresh_token_path: config.cache_path.clone().join("refresh_token.json"),
             config,
             api,
             routes,
             generated_uid,
             generated_gid,
         })
+    }
+
+    /// The refresh token to use: the rotated one if it derives from the configured one.
+    fn current_refresh_token(&self) -> String {
+        let configured = &self.config.refresh_token;
+        fs::read_to_string(&self.refresh_token_path)
+            .ok()
+            .and_then(|s| serde_json::from_str::<StoredRefreshToken>(&s).ok())
+            .filter(|stored| &stored.origin == configured)
+            .map(|stored| stored.current)
+            .unwrap_or_else(|| configured.clone())
     }
 
     fn get_access_token(&self) -> Result<String> {
@@ -176,23 +196,28 @@ impl App {
         }
         debug!("access_token needs to be refreshed");
 
-        // refresh token using the API
+        let refresh_token = self.current_refresh_token();
         let token_response = self.api.refresh_access_token(
             self.config.client_id,
             &self.config.client_secret,
-            &self.config.refresh_token,
+            &refresh_token,
         )?;
 
-        anyhow::ensure!(
-            token_response.refresh_token == self.config.refresh_token,
-            "refresh token changed and I was not implemented to handle that :("
-        );
+        // persist the new refresh token first: the old one may already be invalid
+        if token_response.refresh_token != refresh_token {
+            info!("refresh token rotated, saving the new one");
+            let stored = StoredRefreshToken {
+                origin: self.config.refresh_token.clone(),
+                current: token_response.refresh_token.clone(),
+            };
+            write_private(&self.refresh_token_path, &serde_json::to_vec(&stored)?, None)?;
+        }
 
-        let mut file = fs::File::create(&self.access_token_path)?;
-        file.write_all(token_response.access_token.as_bytes())?;
-        file.set_permissions(Permissions::from_mode(0o600))?;
-        file.set_modified(token_response.expires_at)?;
-        drop(file);
+        write_private(
+            &self.access_token_path,
+            token_response.access_token.as_bytes(),
+            Some(token_response.expires_at),
+        )?;
 
         Ok(token_response.access_token)
     }
