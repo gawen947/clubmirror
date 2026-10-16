@@ -35,6 +35,27 @@ pub fn get_group_by_name_or_gid(group: &str) -> Result<Group> {
     Ok(group)
 }
 
+/// Mode and ownership applied to every public file we generate.
+#[derive(Clone, Copy, Debug)]
+pub struct Perms {
+    pub mode: u32,
+    pub uid: Option<u32>,
+    pub gid: Option<u32>,
+}
+
+impl Perms {
+    /// Write a file (creating parent directories), then apply mode and ownership.
+    pub fn write(&self, path: &Path, contents: impl AsRef<[u8]>) -> Result<()> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(path, contents)?;
+        fs::set_permissions(path, Permissions::from_mode(self.mode))?;
+        chown(path, self.uid, self.gid)?;
+        Ok(())
+    }
+}
+
 /// Atomically write a private (0600) file, optionally setting its mtime (used as expiry date).
 pub fn write_private(path: &Path, contents: &[u8], mtime: Option<SystemTime>) -> Result<()> {
     let tmp = path.with_extension("tmp");
