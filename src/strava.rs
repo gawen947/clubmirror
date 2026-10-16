@@ -174,6 +174,16 @@ pub struct Event {
     pub start_latlng: Option<LatLng>,
 }
 
+impl Event {
+    /// Public page of the event on Strava.
+    pub fn url(&self) -> String {
+        format!(
+            "https://www.strava.com/clubs/{}/group_events/{}",
+            self.club_id, self.id
+        )
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LatLng {
     pub latitude: f64,
