@@ -1,62 +1,64 @@
 use anyhow::Result;
+use log::*;
 use std::{
-    fs::Permissions,
-    io::Write,
-    os::unix::fs::{chown, PermissionsExt},
-    rc::Rc,
+    fs,
+    path::PathBuf,
     time::{Duration, SystemTime},
 };
 
-use log::*;
+use crate::{
+    strava::{StravaApi, TraceType},
+    utils::Perms,
+};
 
-use crate::{Config, StravaApi, TraceType};
-
+/// Cache of the GPX/TCX routes. The mtime of a cached file is its expiry date.
 pub struct RoutesStore {
-    pub config: Rc<Config>,
+    /// Download directory; routes are not downloaded if unset.
+    pub dir: Option<PathBuf>,
     pub ttl: u64,
-    pub api: Rc<StravaApi>,
-    pub permissions: u32,
-    pub uid: Option<u32>,
-    pub gid: Option<u32>,
+    pub perms: Perms,
 }
 
 impl RoutesStore {
     /// Get a route from cache if not expired, otherwise download it.
     pub fn get_route(
         &self,
+        api: &StravaApi,
         route_id: u64,
         trace_type: TraceType,
         access_token: &str,
     ) -> Result<()> {
-        if let Some(downloaded_routes) = &self.config.downloaded_routes {
-            let now = SystemTime::now();
+        let Some(dir) = &self.dir else {
+            return Ok(());
+        };
+        let now = SystemTime::now();
 
-            let extension = match trace_type {
-                TraceType::Tcx => "tcx",
-                TraceType::Gpx => "gpx",
-            };
+        let extension = match trace_type {
+            TraceType::Tcx => "tcx",
+            TraceType::Gpx => "gpx",
+        };
+        let path = dir.join(format!("{}.{}", route_id, extension));
 
-            let path = downloaded_routes.join(format!("{}.{}", route_id, extension));
-
-            let is_expired = if !path.exists() {
-                true
-            } else {
-                let mtime = std::fs::metadata(&path)?.modified()?;
-                mtime < now
-            };
-
-            if is_expired {
-                debug!("downloading route {}", path.display());
-                let response = self.api.get_route(route_id, trace_type, access_token)?;
-
-                let mut file = std::fs::File::create(&path)?;
-                file.write_all(&response.bytes()?)?;
-                file.set_permissions(Permissions::from_mode(self.permissions))?;
-                file.set_modified(now + Duration::from_secs(self.ttl))?;
-                drop(file);
-                chown(&path, self.uid, self.gid)?;
-            }
+        let is_expired = match fs::metadata(&path) {
+            Err(_) => true,
+            Ok(metadata) => metadata.modified()? < now,
+        };
+        if !is_expired {
+            return Ok(());
         }
+
+        debug!("downloading route {}", path.display());
+        let response = api.get_route(route_id, trace_type, access_token)?;
+        if !response.status().is_success() {
+            // only reachable with warn_on_404: never cache an error page as a route
+            return Ok(());
+        }
+
+        self.perms.write(&path, response.bytes()?)?;
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&path)?
+            .set_modified(now + Duration::from_secs(self.ttl))?;
 
         Ok(())
     }

@@ -1,0 +1,43 @@
+# clubmirror example configuration.
+# This file holds secrets: chmod 600, owned by the user running clubmirror.
+# Top-level keys must stay above the [tables].
+
+# Where tokens are cached (created with mode 700 if missing).
+cache_path = "/var/cache/clubmirror"
+
+# Default timezone for clubs that don't set their own (IANA name).
+timezone = "Europe/Brussels"
+
+[api]
+client_id = 12345
+client_secret = "your-strava-client-secret"
+refresh_token = "your-strava-refresh-token"
+# warn_on_404 = false
+
+[generated]
+# permissions = 0o644
+# user = "www"
+# group = "www"
+# Files with these extensions are rendered with Tera, everything else is copied verbatim.
+# template_extensions = ["html", "htm", "xml", "txt", "md", "json", "rss", "atom", "ics", "webmanifest"]
+
+# Download GPX/TCX routes (disabled if unset), and where the site serves them.
+routes_path = "/var/www/clubmirror/routes"
+routes_url = "https://example.org/routes"
+# routes_ttl = 86400
+
+# Generate <club id>.ics calendars (disabled if unset), and where the site serves them.
+calendars_path = "/var/www/clubmirror/calendars"
+calendars_url = "https://example.org/calendars"
+
+[[club]]
+id = 123456
+# name = "My Club"
+template_dir = "/usr/local/share/clubmirror/templates/default"
+output_dir = "/var/www/clubmirror/my-club"
+# timezone = "Europe/Paris"
+past_days = 7
+future_days = 60
+# sort_events = false
+
+# More clubs: add more [[club]] tables.

@@ -11,7 +11,7 @@ panic = "abort"
 [dependencies]
 anyhow = "1.0.104"
 chrono = { version = "0.4.45", features = ["serde"] }
-chrono-tz = "0.10.4"
+chrono-tz = { version = "0.10.4", features = ["serde"] }
 clap = { version = "4.6.7", features = ["cargo"] }
 icalendar = "0.17.15"
 log = "0.4.34"

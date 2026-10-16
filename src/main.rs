@@ -1,122 +1,26 @@
-pub mod calendar;
-pub mod quirk;
-pub mod routes;
-pub mod strava;
-pub mod utils;
-use chrono::{DateTime, Utc};
-pub use strava::*;
-pub mod template;
-pub use template::*;
-pub use utils::*;
+mod calendar;
+mod config;
+mod quirk;
+mod routes;
+mod strava;
+mod template;
+mod utils;
 
 use anyhow::Result;
-use clap::{arg, command, ArgAction};
+use chrono::{DateTime, Duration, Utc};
+use clap::{Arg, ArgAction};
 use log::*;
 use serde::{Deserialize, Serialize};
-use std::fs::{self, Permissions};
-use std::os::unix::fs::{MetadataExt, PermissionsExt};
-use std::path::{Path, PathBuf};
-use std::process::exit;
-use std::rc::Rc;
-use std::time::SystemTime;
-use toml;
+use std::{fs, path::PathBuf, process::exit, time::SystemTime};
+use tera::Context;
 
 use crate::calendar::save_calendar;
+use crate::config::{default_config_path, ClubConfig, Config};
 use crate::quirk::quirk_sort_events;
 use crate::routes::RoutesStore;
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Config {
-    client_id: u64,
-    client_secret: String,
-    refresh_token: String,
-    warn_on_404: Option<bool>, // warn on 404 error from the API instead of failing
-
-    cache_path: PathBuf,
-    template_path: PathBuf,
-    generated_site_path: PathBuf,
-    log_response_path: Option<PathBuf>, // save strava response in the following path for debugging
-    downloaded_routes: Option<PathBuf>, // try to download the TCX/GPX from strava
-    calendars_path: Option<PathBuf>,    // create an ICS calendar from all events
-    routes_url: String,                 // provided to the templates to download the routes TCX/GPX
-    calendars_url: Option<String>,      // provided to the templates to download the calendars
-
-    clubs: Vec<u64>, // IDs of the clubs
-
-    routes_ttl: u64, // expiry time in seconds for route files (TCX/GPX)
-
-    generated_permission: u32,
-    generated_user: Option<String>,
-    generated_group: Option<String>,
-    generated_past_days: Option<u32>, // show events up to x days in the past
-    generated_future_days: Option<u32>, // show events up to x days in the future
-
-    quirk_save_json: Option<PathBuf>, // save the resulting JSON for each clubs in the given path
-    quirk_local_json: Option<PathBuf>, // use the given JSON instead of asking the API (avoid spamming it)
-    quirk_sort_events: Option<bool>,   // sort the events after filter (useful if rescheduled)
-}
-
-/// Default location of the config file when `--config` is not given.
-fn default_config_path() -> PathBuf {
-    let base = match std::env::consts::OS {
-        "freebsd" => "/usr/local/etc",
-        _ => "/etc",
-    };
-    PathBuf::from(base).join("clubmirror").join("config.toml")
-}
-
-impl Config {
-    fn new(config_path: &Path) -> Result<Self> {
-        // check file permissions for security
-        let metadata = fs::metadata(config_path)?;
-        anyhow::ensure!(
-            metadata.is_file(),
-            "{} is not a regular file",
-            config_path.display()
-        );
-        anyhow::ensure!(
-            metadata.mode() & 0o077 == 0,
-            "{} must not be accessible by group/others (chmod 600)",
-            config_path.display()
-        );
-        anyhow::ensure!(
-            metadata.uid() == users::get_effective_uid(),
-            "{} must be owned by the user running clubmirror",
-            config_path.display()
-        );
-
-        let config_str = fs::read_to_string(config_path)?;
-        let config_file: Config = toml::from_str(&config_str)?;
-
-        Ok(config_file)
-    }
-
-    fn check_cache_permission(&self) -> Result<()> {
-        if !self.cache_path.exists() {
-            fs::create_dir_all(&self.cache_path)?;
-            fs::set_permissions(&self.cache_path, Permissions::from_mode(0o700))?;
-        }
-
-        let metadata = fs::metadata(&self.cache_path)?;
-        anyhow::ensure!(
-            metadata.is_dir(),
-            "{} is not a directory",
-            self.cache_path.display()
-        );
-        anyhow::ensure!(
-            metadata.mode() & 0o777 == 0o700,
-            "{} is not permission 700",
-            self.cache_path.display()
-        );
-        anyhow::ensure!(
-            metadata.uid() == users::get_effective_uid(),
-            "{} must be owned by the user running clubmirror",
-            self.cache_path.display()
-        );
-
-        Ok(())
-    }
-}
+use crate::strava::{Event, StravaApi, TraceType};
+use crate::template::render_site;
+use crate::utils::{get_group_by_name_or_gid, get_user_by_name_or_uid, write_private, Perms};
 
 /// Rotated refresh token, kept in the cache directory. `origin` is the refresh token of the
 /// config file it was derived from: if the config changes, the cached token is stale.
@@ -127,55 +31,49 @@ struct StoredRefreshToken {
 }
 
 struct App {
-    config: Rc<Config>,
+    config: Config,
+    api: StravaApi,
+    routes: RoutesStore,
+    perms: Perms,
     access_token_path: PathBuf,
     refresh_token_path: PathBuf,
-    routes: RoutesStore,
-    api: Rc<StravaApi>,
-
-    generated_uid: Option<u32>,
-    generated_gid: Option<u32>,
 }
 
 impl App {
     fn new(config: Config, api: StravaApi) -> Result<Self> {
-        let generated_uid = if let Some(user) = &config.generated_user {
-            Some(get_user_by_name_or_uid(user)?.uid())
-        } else {
-            None
+        let uid = match &config.generated.user {
+            Some(user) => Some(get_user_by_name_or_uid(user)?.uid()),
+            None => None,
         };
-        let generated_gid = if let Some(group) = &config.generated_group {
-            Some(get_group_by_name_or_gid(group)?.gid())
-        } else {
-            None
+        let gid = match &config.generated.group {
+            Some(group) => Some(get_group_by_name_or_gid(group)?.gid()),
+            None => None,
         };
-
-        let config = Rc::new(config);
-        let api = Rc::new(api);
+        let perms = Perms {
+            mode: config.generated.permissions,
+            uid,
+            gid,
+        };
 
         let routes = RoutesStore {
-            config: Rc::clone(&config),
-            api: Rc::clone(&api),
-            ttl: config.routes_ttl,
-            permissions: config.generated_permission,
-            uid: generated_uid,
-            gid: generated_gid,
+            dir: config.generated.routes_path.clone(),
+            ttl: config.generated.routes_ttl,
+            perms,
         };
 
         Ok(Self {
-            access_token_path: config.cache_path.clone().join("access_token"),
-            refresh_token_path: config.cache_path.clone().join("refresh_token.json"),
+            access_token_path: config.cache_path.join("access_token"),
+            refresh_token_path: config.cache_path.join("refresh_token.json"),
             config,
             api,
             routes,
-            generated_uid,
-            generated_gid,
+            perms,
         })
     }
 
     /// The refresh token to use: the rotated one if it derives from the configured one.
     fn current_refresh_token(&self) -> String {
-        let configured = &self.config.refresh_token;
+        let configured = &self.config.api.refresh_token;
         fs::read_to_string(&self.refresh_token_path)
             .ok()
             .and_then(|s| serde_json::from_str::<StoredRefreshToken>(&s).ok())
@@ -198,8 +96,8 @@ impl App {
 
         let refresh_token = self.current_refresh_token();
         let token_response = self.api.refresh_access_token(
-            self.config.client_id,
-            &self.config.client_secret,
+            self.config.api.client_id,
+            &self.config.api.client_secret,
             &refresh_token,
         )?;
 
@@ -207,10 +105,14 @@ impl App {
         if token_response.refresh_token != refresh_token {
             info!("refresh token rotated, saving the new one");
             let stored = StoredRefreshToken {
-                origin: self.config.refresh_token.clone(),
+                origin: self.config.api.refresh_token.clone(),
                 current: token_response.refresh_token.clone(),
             };
-            write_private(&self.refresh_token_path, &serde_json::to_vec(&stored)?, None)?;
+            write_private(
+                &self.refresh_token_path,
+                &serde_json::to_vec(&stored)?,
+                None,
+            )?;
         }
 
         write_private(
@@ -222,69 +124,62 @@ impl App {
         Ok(token_response.access_token)
     }
 
-    /// filter predicate for events that are too far in the past or the future
-    fn event_filter(&self, now: &DateTime<Utc>, event: &Event) -> bool {
-        let created_at = event.created_at;
-        let occurences = &event.upcoming_occurrences;
-
-        let occurence_min = occurences.iter().min().copied();
-        let occurence_max = occurences.iter().max().copied();
-
-        if let Some(past_days) = self.config.generated_past_days {
-            let past = now.clone() - chrono::Duration::days(past_days as i64);
-
-            if let Some(occurence_max) = occurence_max {
-                return occurence_max > past;
-            } else if let Some(created_at) = created_at {
-                return created_at > past;
-            }
-        }
-
-        if let Some(future_days) = self.config.generated_future_days {
-            let future = now.clone() + chrono::Duration::days(future_days as i64);
-
-            if let Some(occurence_min) = occurence_min {
-                return occurence_min < future;
-            }
-        }
-
-        true
-    }
-
-    fn process_club(&self, club_id: u64) -> Result<()> {
-        info!("processing club {}", club_id);
+    fn process_club(&self, club: &ClubConfig) -> Result<()> {
+        info!("processing club {}", club.id);
 
         let access_token = self.get_access_token()?;
 
-        let events = if let Some(local_json_path) = &self.config.quirk_local_json {
+        let events = if let Some(local_json_path) = &self.config.api.quirk_local_json {
             self.api.get_group_events_from_file(local_json_path)?
         } else {
-            self.api.get_group_events(club_id, &access_token)?
+            self.api.get_group_events(club.id, &access_token)?
         };
 
+        let timezone = club.timezone_or(self.config.timezone);
+        let club_name = club
+            .name
+            .clone()
+            .or_else(|| events.first().map(|event| event.club.name.clone()))
+            .unwrap_or_else(|| format!("Club {}", club.id));
+
         // save the calendar if needed
-        if let Some(calendars_path) = &self.config.calendars_path {
-            save_calendar(&events, &calendars_path.join(&format!("{}.ics", club_id)))?;
+        let generated = &self.config.generated;
+        let calendar_file = format!("{}.ics", club.id);
+        if let Some(calendars_path) = &generated.calendars_path {
+            save_calendar(
+                &events,
+                &club_name,
+                timezone,
+                &calendars_path.join(&calendar_file),
+                &self.perms,
+            )?;
         }
 
         // filter events based on time
         let now = Utc::now();
         let mut events: Vec<Event> = events
             .into_iter()
-            .filter(|event| self.event_filter(&now, event))
+            .filter(|event| {
+                in_window(
+                    &now,
+                    event.upcoming_occurrences.iter().min().copied(),
+                    event.upcoming_occurrences.iter().max().copied(),
+                    event.created_at,
+                    club.past_days,
+                    club.future_days,
+                )
+            })
             .collect();
 
-        // sort events if needed
-        if self.config.quirk_sort_events.unwrap_or(false) {
+        if club.sort_events {
             events = quirk_sort_events(events);
         }
 
         // save events JSON if needed
-        if let Some(json_destination_path) = &self.config.quirk_save_json {
-            let json_string = serde_json::to_string_pretty(&events)?;
-            fs::write(
-                json_destination_path.join(format!("{}.json", club_id)),
-                &json_string,
+        if let Some(json_destination_path) = &generated.quirk_save_json {
+            self.perms.write(
+                &json_destination_path.join(format!("{}.json", club.id)),
+                serde_json::to_string_pretty(&events)?,
             )?;
         }
 
@@ -292,58 +187,102 @@ impl App {
         for event in events.iter() {
             if let Some(route_id) = event.route_id {
                 self.routes
-                    .get_route(route_id, TraceType::Tcx, &access_token)?;
+                    .get_route(&self.api, route_id, TraceType::Tcx, &access_token)?;
                 self.routes
-                    .get_route(route_id, TraceType::Gpx, &access_token)?;
+                    .get_route(&self.api, route_id, TraceType::Gpx, &access_token)?;
             }
         }
 
-        // generate the template
-        let club_id_str = club_id.to_string();
-        let template_path = self.config.template_path.join(&club_id_str);
-        let generated_path = self.config.generated_site_path.join(&club_id_str);
-        let template = Template::new(
-            &template_path,
-            &generated_path,
-            &self.config.routes_url,
-            self.config.calendars_url.as_deref(),
-            &events,
-            club_id,
-            self.config.generated_permission,
-            self.generated_uid,
-            self.generated_gid,
-        )?;
-        template.generate()?;
+        // generate the site
+        let mut context = Context::new();
+        context.insert("club_id", &club.id);
+        context.insert("club_name", &club_name);
+        context.insert("timezone", timezone.name());
+        context.insert("events", &events);
+        context.insert("total_events", &events.len());
+        context.insert(
+            "generated_at",
+            &now.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+        );
+        if let Some(url) = &generated.routes_url {
+            context.insert("routes_url", url);
+        }
+        if let Some(url) = &generated.calendars_url {
+            context.insert("calendars_url", url);
+            context.insert(
+                "calendar_url",
+                &format!("{}/{}", url.trim_end_matches('/'), calendar_file),
+            );
+        }
 
-        Ok(())
+        render_site(
+            &club.template_dir,
+            &club.output_dir,
+            &context,
+            &generated.template_extensions,
+            &self.perms,
+        )
     }
 }
 
+/// Whether an event is inside the club's past/future window.
+/// Past: the last occurrence (or the creation date if none) must be newer than `past_days`.
+/// Future: the first occurrence must be less than `future_days` ahead.
+fn in_window(
+    now: &DateTime<Utc>,
+    first: Option<DateTime<Utc>>,
+    last: Option<DateTime<Utc>>,
+    created_at: Option<DateTime<Utc>>,
+    past_days: Option<u32>,
+    future_days: Option<u32>,
+) -> bool {
+    if let Some(days) = past_days {
+        let limit = *now - Duration::days(days as i64);
+        if let Some(reference) = last.or(created_at) {
+            if reference <= limit {
+                return false;
+            }
+        }
+    }
+
+    if let Some(days) = future_days {
+        let limit = *now + Duration::days(days as i64);
+        if let Some(first) = first {
+            if first >= limit {
+                return false;
+            }
+        }
+    }
+
+    true
+}
+
 fn main() {
-    // basic command line parsing
-    let matches = command!()
+    let matches = clap::command!()
         .arg(
-            arg!(
-                -c --config <PATH> "Path to the configuration file [default: system config dir]"
-            )
-            .value_parser(clap::value_parser!(PathBuf)),
+            Arg::new("config")
+                .short('c')
+                .long("config")
+                .value_name("PATH")
+                .value_parser(clap::value_parser!(PathBuf))
+                .help("Path to the configuration file [default: system config dir]"),
         )
         .arg(
-            arg!(
-                -q --quiet "Silence all output"
-            )
-            .action(ArgAction::SetTrue),
+            Arg::new("quiet")
+                .short('q')
+                .long("quiet")
+                .help("Silence all output")
+                .action(ArgAction::SetTrue),
         )
         .arg(
-            arg!(
-                -v --verbose "Increase log verbosity"
-            )
-            .required(false)
-            .action(ArgAction::Count),
+            Arg::new("verbose")
+                .short('v')
+                .long("verbose")
+                .help("Increase log verbosity")
+                .action(ArgAction::Count),
         )
         .get_matches();
 
-    // configure logger
     stderrlog::new()
         .module(module_path!())
         .quiet(matches.get_flag("quiet"))
@@ -353,35 +292,67 @@ fn main() {
         .unwrap();
     debug!("log operational");
 
-    // load config
     let config_path = matches
         .get_one::<PathBuf>("config")
         .cloned()
         .unwrap_or_else(default_config_path);
-    let config = Config::new(&config_path).unwrap_or_else(|e| {
+    let config = Config::load(&config_path).unwrap_or_else(|e| {
         error!("Cannot load config: {:#}", e);
         exit(1);
     });
-    config.check_cache_permission().unwrap_or_else(|e| {
+    config.prepare_cache().unwrap_or_else(|e| {
         error!("Invalid cache path: {:#}", e);
         exit(1);
     });
-    debug!("config loaded");
+    debug!("config loaded from {}", config_path.display());
 
-    let api = StravaApi::new(config.warn_on_404.unwrap_or(false), config.log_response_path.clone());
+    let api = StravaApi::new(
+        config.api.warn_on_404,
+        config.api.log_response_path.clone(),
+    );
     let app = App::new(config, api).unwrap_or_else(|e| {
         error!("cannot initialize app: {:#}", e);
         exit(1);
     });
     debug!("app ready");
 
-    // fixme: do that in // but we probably don't need it since we will later have a SPA page
     let mut code = 0;
     for club in &app.config.clubs {
-        app.process_club(*club).unwrap_or_else(|e| {
-            warn!("could not process club {}: {:#}", club, e);
+        app.process_club(club).unwrap_or_else(|e| {
+            warn!("could not process club {}: {:#}", club.id, e);
             code = 2;
         });
     }
     exit(code);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    fn at(day: u32) -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2026, 6, day, 12, 0, 0).unwrap()
+    }
+
+    #[test]
+    fn window_past_and_future_are_both_applied() {
+        let now = at(15);
+        // past window only
+        assert!(!in_window(&now, Some(at(1)), Some(at(2)), None, Some(7), None));
+        assert!(in_window(&now, Some(at(10)), Some(at(10)), None, Some(7), None));
+        // future window only
+        assert!(!in_window(&now, Some(at(25)), Some(at(25)), None, None, Some(7)));
+        // both: the future limit must still apply when a past limit is set (old bug)
+        assert!(!in_window(&now, Some(at(25)), Some(at(25)), None, Some(7), Some(7)));
+        assert!(in_window(&now, Some(at(16)), Some(at(16)), None, Some(7), Some(7)));
+    }
+
+    #[test]
+    fn window_without_occurrences_uses_creation_date() {
+        let now = at(15);
+        assert!(!in_window(&now, None, None, Some(at(1)), Some(7), None));
+        assert!(in_window(&now, None, None, Some(at(14)), Some(7), None));
+        assert!(in_window(&now, None, None, None, Some(7), Some(7)));
+    }
 }
