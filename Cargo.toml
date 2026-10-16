@@ -13,8 +13,8 @@ anyhow = "1.0.104"
 chrono = { version = "0.4.45", features = ["serde"] }
 chrono-tz = { version = "0.10.4", features = ["serde"] }
 clap = { version = "4.6.7", features = ["cargo"] }
-icalendar = "0.17.15"
-log = "0.4.34"
+icalendar = "0.17.17"
+log = "0.4.35"
 reqwest = { version = "0.12.28", features = ["blocking", "json"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
