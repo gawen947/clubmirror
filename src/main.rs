@@ -15,8 +15,8 @@ use log::*;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, Permissions};
 use std::io::Write;
-use std::os::unix::fs::{chown, MetadataExt, PermissionsExt};
-use std::path::PathBuf;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
+use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::rc::Rc;
 use std::time::SystemTime;
@@ -60,30 +60,32 @@ pub struct Config {
     quirk_sort_events: Option<bool>,   // sort the events after filter (useful if rescheduled)
 }
 
-impl Config {
-    fn new() -> Result<Self> {
-        let mut config_path: PathBuf = match std::env::consts::OS {
-            "freebsd" => "/usr/local/etc".into(),
-            _ => "/etc".into(),
-        };
-        config_path.push("lbs-mirror");
-        config_path.push("config.toml");
+/// Default location of the config file when `--config` is not given.
+fn default_config_path() -> PathBuf {
+    let base = match std::env::consts::OS {
+        "freebsd" => "/usr/local/etc",
+        _ => "/etc",
+    };
+    PathBuf::from(base).join("clubmirror").join("config.toml")
+}
 
+impl Config {
+    fn new(config_path: &Path) -> Result<Self> {
         // check file permissions for security
-        let metadata = fs::metadata(&config_path)?;
+        let metadata = fs::metadata(config_path)?;
         anyhow::ensure!(
             metadata.is_file(),
             "{} is not a regular file",
             config_path.display()
         );
         anyhow::ensure!(
-            metadata.mode() & 0o777 == 0o600,
-            "{} is not permission 600",
+            metadata.mode() & 0o077 == 0,
+            "{} must not be accessible by group/others (chmod 600)",
             config_path.display()
         );
         anyhow::ensure!(
-            metadata.uid() == 0 && metadata.gid() == 0,
-            "{} should be owned by 0:0",
+            metadata.uid() == users::get_effective_uid(),
+            "{} must be owned by the user running clubmirror",
             config_path.display()
         );
 
@@ -94,6 +96,11 @@ impl Config {
     }
 
     fn check_cache_permission(&self) -> Result<()> {
+        if !self.cache_path.exists() {
+            fs::create_dir_all(&self.cache_path)?;
+            fs::set_permissions(&self.cache_path, Permissions::from_mode(0o700))?;
+        }
+
         let metadata = fs::metadata(&self.cache_path)?;
         anyhow::ensure!(
             metadata.is_dir(),
@@ -106,8 +113,8 @@ impl Config {
             self.cache_path.display()
         );
         anyhow::ensure!(
-            metadata.uid() == 0 && metadata.gid() == 0,
-            "{} should be owned by 0:0",
+            metadata.uid() == users::get_effective_uid(),
+            "{} must be owned by the user running clubmirror",
             self.cache_path.display()
         );
 
@@ -189,7 +196,6 @@ impl App {
         file.set_permissions(Permissions::from_mode(0o600))?;
         file.set_modified(token_response.expires_at)?;
         drop(file);
-        chown(&self.access_token_path, Some(0), Some(0))?;
 
         Ok(token_response.access_token)
     }
@@ -305,6 +311,12 @@ fn main() {
     let matches = command!()
         .arg(
             arg!(
+                -c --config <PATH> "Path to the configuration file [default: system config dir]"
+            )
+            .value_parser(clap::value_parser!(PathBuf)),
+        )
+        .arg(
+            arg!(
                 -q --quiet "Silence all output"
             )
             .action(ArgAction::SetTrue),
@@ -329,7 +341,11 @@ fn main() {
     debug!("log operational");
 
     // load config
-    let config = Config::new().unwrap_or_else(|e| {
+    let config_path = matches
+        .get_one::<PathBuf>("config")
+        .cloned()
+        .unwrap_or_else(default_config_path);
+    let config = Config::new(&config_path).unwrap_or_else(|e| {
         error!("Cannot load config: {:#}", e);
         exit(1);
     });

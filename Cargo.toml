@@ -1,6 +1,6 @@
 [package]
-name = "lbs-mirror"
-version = "0.2.3"
+name = "clubmirror"
+version = "0.3.0"
 edition = "2021"
 
 [profile.release]
