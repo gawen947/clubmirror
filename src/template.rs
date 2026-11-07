@@ -1,4 +1,4 @@
-use anyhow::{anyhow, ensure, Context as _, Result};
+use anyhow::{Context as _, Result, anyhow, ensure};
 use log::*;
 use std::{
     fs,
@@ -64,6 +64,9 @@ pub fn render_site(
 
     // register every template (partials included) so extends/include can resolve them
     let mut tera = Tera::default();
+
+    crate::filters::register(&mut tera);
+
     let mut to_register = Vec::new();
     for rel in files.iter().filter(|f| has_extension(f, &extensions)) {
         let name = rel

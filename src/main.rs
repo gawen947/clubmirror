@@ -1,5 +1,6 @@
 mod calendar;
 mod config;
+mod filters;
 mod quirk;
 mod routes;
 mod strava;
