@@ -49,9 +49,11 @@ impl Perms {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
+
         fs::write(path, contents)?;
         fs::set_permissions(path, Permissions::from_mode(self.mode))?;
         chown(path, self.uid, self.gid)?;
+
         Ok(())
     }
 }
@@ -59,6 +61,7 @@ impl Perms {
 /// Atomically write a private (0600) file, optionally setting its mtime (used as expiry date).
 pub fn write_private(path: &Path, contents: &[u8], mtime: Option<SystemTime>) -> Result<()> {
     let tmp = path.with_extension("tmp");
+
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
@@ -66,10 +69,14 @@ pub fn write_private(path: &Path, contents: &[u8], mtime: Option<SystemTime>) ->
         .mode(0o600)
         .open(&tmp)?;
     file.write_all(contents)?;
+
     if let Some(mtime) = mtime {
         file.set_modified(mtime)?;
     }
+
     drop(file);
+
     fs::rename(&tmp, path)?;
+
     Ok(())
 }

@@ -231,3 +231,15 @@ pub enum TraceType {
     Tcx,
     Gpx,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn example_events_parse() {
+        let events: Vec<Event> =
+            serde_json::from_str(include_str!("../examples/events.json")).unwrap();
+        assert!(events.len() >= 8);
+    }
+}

@@ -39,8 +39,7 @@ fn is_partial(path: &Path) -> bool {
         .any(|c| c.as_os_str().to_string_lossy().starts_with('_'))
 }
 
-/// Render the template directory into the output directory: files with one of the given
-/// extensions go through Tera, everything else is copied verbatim.
+/// Render the template directory into the output directory. Only files with proper extensions go through Tera.
 pub fn render_site(
     template_dir: &Path,
     output_dir: &Path,

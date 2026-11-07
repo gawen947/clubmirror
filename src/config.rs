@@ -255,9 +255,15 @@ mod tests {
 
     #[test]
     fn example_config_parses() {
-        let config: Config = toml::from_str(include_str!("../config.example.toml")).unwrap();
+        let config: Config = toml::from_str(include_str!("../config.toml.sample")).unwrap();
         assert!(!config.clubs.is_empty());
         assert_eq!(config.generated.permissions, 0o644);
+    }
+
+    #[test]
+    fn local_example_config_parses() {
+        let config: Config = toml::from_str(include_str!("../examples/config.toml")).unwrap();
+        assert!(config.api.quirk_local_json.is_some());
     }
 
     #[test]

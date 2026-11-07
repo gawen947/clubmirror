@@ -8,6 +8,7 @@ mod utils;
 
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
+use chrono_tz::Tz;
 use clap::{Arg, ArgAction};
 use log::*;
 use serde::{Deserialize, Serialize};
@@ -15,19 +16,18 @@ use std::{fs, path::PathBuf, process::exit, time::SystemTime};
 use tera::Context;
 
 use crate::calendar::save_calendar;
-use crate::config::{default_config_path, ClubConfig, Config};
+use crate::config::{default_config_path, ClubConfig, Config, GeneratedConfig};
 use crate::quirk::quirk_sort_events;
 use crate::routes::RoutesStore;
 use crate::strava::{Event, StravaApi, TraceType};
 use crate::template::render_site;
 use crate::utils::{get_group_by_name_or_gid, get_user_by_name_or_uid, write_private, Perms};
 
-/// Rotated refresh token, kept in the cache directory. `origin` is the refresh token of the
-/// config file it was derived from: if the config changes, the cached token is stale.
+/// Rotated refresh token, kept in the cache directory.
 #[derive(Serialize, Deserialize)]
 struct StoredRefreshToken {
-    origin: String,
-    current: String,
+    origin: String,  // origin refresh token before any rotation
+    current: String, // current refreshed token
 }
 
 struct App {
@@ -71,7 +71,7 @@ impl App {
         })
     }
 
-    /// The refresh token to use: the rotated one if it derives from the configured one.
+    /// Fetch the appropriate token, the refreshed one or the origin one from the config file.
     fn current_refresh_token(&self) -> String {
         let configured = &self.config.api.refresh_token;
         fs::read_to_string(&self.refresh_token_path)
@@ -94,6 +94,7 @@ impl App {
         }
         debug!("access_token needs to be refreshed");
 
+        // refresh token and check if the cached version must be updated
         let refresh_token = self.current_refresh_token();
         let token_response = self.api.refresh_access_token(
             self.config.api.client_id,
@@ -101,13 +102,13 @@ impl App {
             &refresh_token,
         )?;
 
-        // persist the new refresh token first: the old one may already be invalid
         if token_response.refresh_token != refresh_token {
             info!("refresh token rotated, saving the new one");
             let stored = StoredRefreshToken {
                 origin: self.config.api.refresh_token.clone(),
                 current: token_response.refresh_token.clone(),
             };
+
             write_private(
                 &self.refresh_token_path,
                 &serde_json::to_vec(&stored)?,
@@ -127,12 +128,14 @@ impl App {
     fn process_club(&self, club: &ClubConfig) -> Result<()> {
         info!("processing club {}", club.id);
 
-        let access_token = self.get_access_token()?;
-
-        let events = if let Some(local_json_path) = &self.config.api.quirk_local_json {
-            self.api.get_group_events_from_file(local_json_path)?
-        } else {
-            self.api.get_group_events(club.id, &access_token)?
+        // local JSON mode: no token, no network, and routes are not downloaded
+        let (events, access_token) = match &self.config.api.quirk_local_json {
+            Some(local_json_path) => (self.api.get_group_events_from_file(local_json_path)?, None),
+            None => {
+                let access_token = self.get_access_token()?;
+                let events = self.api.get_group_events(club.id, &access_token)?;
+                (events, Some(access_token))
+            }
         };
 
         let timezone = club.timezone_or(self.config.timezone);
@@ -184,36 +187,19 @@ impl App {
         }
 
         // download routes if needed
-        for event in events.iter() {
-            if let Some(route_id) = event.route_id {
-                self.routes
-                    .get_route(&self.api, route_id, TraceType::Tcx, &access_token)?;
-                self.routes
-                    .get_route(&self.api, route_id, TraceType::Gpx, &access_token)?;
+        if let Some(access_token) = &access_token {
+            for event in events.iter() {
+                if let Some(route_id) = event.route_id {
+                    self.routes
+                        .get_route(&self.api, route_id, TraceType::Tcx, access_token)?;
+                    self.routes
+                        .get_route(&self.api, route_id, TraceType::Gpx, access_token)?;
+                }
             }
         }
 
         // generate the site
-        let mut context = Context::new();
-        context.insert("club_id", &club.id);
-        context.insert("club_name", &club_name);
-        context.insert("timezone", timezone.name());
-        context.insert("events", &events);
-        context.insert("total_events", &events.len());
-        context.insert(
-            "generated_at",
-            &now.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
-        );
-        if let Some(url) = &generated.routes_url {
-            context.insert("routes_url", url);
-        }
-        if let Some(url) = &generated.calendars_url {
-            context.insert("calendars_url", url);
-            context.insert(
-                "calendar_url",
-                &format!("{}/{}", url.trim_end_matches('/'), calendar_file),
-            );
-        }
+        let context = site_context(club, &club_name, timezone, &events, &now, generated);
 
         render_site(
             &club.template_dir,
@@ -223,6 +209,38 @@ impl App {
             &self.perms,
         )
     }
+}
+
+/// Variables given to the templates (documented in docs/templates.md).
+fn site_context(
+    club: &ClubConfig,
+    club_name: &str,
+    timezone: Tz,
+    events: &[Event],
+    now: &DateTime<Utc>,
+    generated: &GeneratedConfig,
+) -> Context {
+    let mut context = Context::new();
+    context.insert("club_id", &club.id);
+    context.insert("club_name", club_name);
+    context.insert("timezone", timezone.name());
+    context.insert("events", events);
+    context.insert("total_events", &events.len());
+    context.insert(
+        "generated_at",
+        &now.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+    );
+    if let Some(url) = &generated.routes_url {
+        context.insert("routes_url", url);
+    }
+    if let Some(url) = &generated.calendars_url {
+        context.insert("calendars_url", url);
+        context.insert(
+            "calendar_url",
+            &format!("{}/{}.ics", url.trim_end_matches('/'), club.id),
+        );
+    }
+    context
 }
 
 /// Whether an event is inside the club's past/future window.
@@ -378,6 +396,64 @@ mod tests {
             Some(7),
             Some(7)
         ));
+    }
+
+    #[test]
+    fn default_template_renders_the_example_events() {
+        let events: Vec<Event> =
+            serde_json::from_str(include_str!("../examples/events.json")).unwrap();
+        let root = std::env::temp_dir().join(format!("clubmirror-site-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+
+        let club = ClubConfig {
+            id: 100001,
+            name: None,
+            template_dir: PathBuf::new(),
+            output_dir: root.clone(),
+            timezone: None,
+            past_days: None,
+            future_days: None,
+            sort_events: false,
+        };
+        let generated = GeneratedConfig {
+            routes_url: Some("routes".into()),
+            calendars_url: Some("calendars/".into()),
+            ..GeneratedConfig::default()
+        };
+        let perms = Perms {
+            mode: 0o644,
+            uid: None,
+            gid: None,
+        };
+        let context = site_context(
+            &club,
+            "Clubmirror Cycling Club",
+            Tz::Europe__London,
+            &events,
+            &Utc::now(),
+            &generated,
+        );
+        let templates = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("templates/default");
+        render_site(
+            &templates,
+            &root,
+            &context,
+            &generated.template_extensions,
+            &perms,
+        )
+        .unwrap();
+
+        let html = fs::read_to_string(root.join("index.html")).unwrap();
+        assert!(html.contains("Clubmirror Cycling Club"));
+        assert!(html.contains("100001.ics"));
+        assert!(html.contains("routes/7000000000000000001.gpx"));
+        // special characters are escaped
+        assert!(html.contains("&amp;"));
+        assert!(!html.contains("<script>alert"));
+        // members-only events are hidden by default
+        assert!(!html.contains("Members-only"));
+        assert!(root.join("style.css").exists() && root.join("go.js").exists());
+        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]
