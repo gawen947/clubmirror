@@ -26,7 +26,7 @@ impl StravaApi {
         Self {
             client: Client::new(),
             warn_on_404,
-            log_response_path
+            log_response_path,
         }
     }
 
@@ -66,7 +66,7 @@ impl StravaApi {
             let status_code = response.status().as_u16();
 
             if self.warn_on_404 && status_code == 404 {
-                warn!("got a 404 for {}", &url);
+                warn!("got a 404 for {}", url);
             } else {
                 return Err(anyhow!(
                     "API call failed: {} {}",
@@ -81,10 +81,12 @@ impl StravaApi {
 
     pub fn get_group_events(&self, club_id: u64, access_token: &str) -> Result<Vec<Event>> {
         // parse response as text because we might have to save is (and we cannot clone a response)
-        let response = self.get(&format!("clubs/{}/group_events", club_id), access_token)?.text()?;
+        let response = self
+            .get(&format!("clubs/{}/group_events", club_id), access_token)?
+            .text()?;
 
         if let Some(log_response_path) = &self.log_response_path {
-            std::fs::write(&log_response_path, &response)?;
+            std::fs::write(log_response_path, &response)?;
         }
 
         Ok(serde_json::from_str(&response)?)

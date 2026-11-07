@@ -32,9 +32,20 @@ const fn default_routes_ttl() -> u64 {
 }
 
 fn default_template_extensions() -> Vec<String> {
-    ["html", "htm", "xml", "txt", "md", "json", "rss", "atom", "ics", "webmanifest"]
-        .map(String::from)
-        .into()
+    [
+        "html",
+        "htm",
+        "xml",
+        "txt",
+        "md",
+        "json",
+        "rss",
+        "atom",
+        "ics",
+        "webmanifest",
+    ]
+    .map(String::from)
+    .into()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -180,7 +191,11 @@ impl Config {
     pub fn load(path: &Path) -> Result<Self> {
         let metadata =
             fs::metadata(path).with_context(|| format!("cannot read {}", path.display()))?;
-        ensure!(metadata.is_file(), "{} is not a regular file", path.display());
+        ensure!(
+            metadata.is_file(),
+            "{} is not a regular file",
+            path.display()
+        );
         ensure!(
             metadata.mode() & 0o077 == 0,
             "{} must not be accessible by group/others (chmod 600)",
@@ -263,7 +278,10 @@ mod tests {
         .unwrap();
         assert_eq!(config.timezone, Tz::UTC);
         assert_eq!(config.generated.routes_ttl, 86_400);
-        assert!(config.generated.template_extensions.contains(&"html".to_string()));
+        assert!(config
+            .generated
+            .template_extensions
+            .contains(&"html".to_string()));
         assert_eq!(config.clubs[0].timezone_or(config.timezone), Tz::UTC);
     }
 }

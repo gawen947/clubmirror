@@ -110,16 +110,27 @@ mod tests {
         )
         .unwrap();
         fs::write(tpl.join("_partials/x.html"), "hidden").unwrap();
-        fs::write(tpl.join("css/site.css"), "a { color: red } {{ not_a_template }}").unwrap();
+        fs::write(
+            tpl.join("css/site.css"),
+            "a { color: red } {{ not_a_template }}",
+        )
+        .unwrap();
         fs::write(tpl.join(".hidden"), "x").unwrap();
 
         let mut context = Context::new();
         context.insert("club_name", "Test");
-        let perms = Perms { mode: 0o644, uid: None, gid: None };
+        let perms = Perms {
+            mode: 0o644,
+            uid: None,
+            gid: None,
+        };
         let extensions = vec!["html".to_string()];
         render_site(&tpl, &out, &context, &extensions, &perms).unwrap();
 
-        assert_eq!(fs::read_to_string(out.join("index.html")).unwrap(), "<b>Test</b>");
+        assert_eq!(
+            fs::read_to_string(out.join("index.html")).unwrap(),
+            "<b>Test</b>"
+        );
         assert_eq!(
             fs::read_to_string(out.join("css/site.css")).unwrap(),
             "a { color: red } {{ not_a_template }}"

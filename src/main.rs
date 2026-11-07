@@ -306,10 +306,7 @@ fn main() {
     });
     debug!("config loaded from {}", config_path.display());
 
-    let api = StravaApi::new(
-        config.api.warn_on_404,
-        config.api.log_response_path.clone(),
-    );
+    let api = StravaApi::new(config.api.warn_on_404, config.api.log_response_path.clone());
     let app = App::new(config, api).unwrap_or_else(|e| {
         error!("cannot initialize app: {:#}", e);
         exit(1);
@@ -339,13 +336,48 @@ mod tests {
     fn window_past_and_future_are_both_applied() {
         let now = at(15);
         // past window only
-        assert!(!in_window(&now, Some(at(1)), Some(at(2)), None, Some(7), None));
-        assert!(in_window(&now, Some(at(10)), Some(at(10)), None, Some(7), None));
+        assert!(!in_window(
+            &now,
+            Some(at(1)),
+            Some(at(2)),
+            None,
+            Some(7),
+            None
+        ));
+        assert!(in_window(
+            &now,
+            Some(at(10)),
+            Some(at(10)),
+            None,
+            Some(7),
+            None
+        ));
         // future window only
-        assert!(!in_window(&now, Some(at(25)), Some(at(25)), None, None, Some(7)));
+        assert!(!in_window(
+            &now,
+            Some(at(25)),
+            Some(at(25)),
+            None,
+            None,
+            Some(7)
+        ));
         // both: the future limit must still apply when a past limit is set (old bug)
-        assert!(!in_window(&now, Some(at(25)), Some(at(25)), None, Some(7), Some(7)));
-        assert!(in_window(&now, Some(at(16)), Some(at(16)), None, Some(7), Some(7)));
+        assert!(!in_window(
+            &now,
+            Some(at(25)),
+            Some(at(25)),
+            None,
+            Some(7),
+            Some(7)
+        ));
+        assert!(in_window(
+            &now,
+            Some(at(16)),
+            Some(at(16)),
+            None,
+            Some(7),
+            Some(7)
+        ));
     }
 
     #[test]

@@ -64,7 +64,11 @@ mod tests {
         .unwrap();
 
         let path = std::env::temp_dir().join(format!("clubmirror-{}.ics", std::process::id()));
-        let perms = Perms { mode: 0o644, uid: None, gid: None };
+        let perms = Perms {
+            mode: 0o644,
+            uid: None,
+            gid: None,
+        };
         save_calendar(&[event], "My Club", Tz::Europe__Brussels, &path, &perms).unwrap();
 
         let ics = std::fs::read_to_string(&path).unwrap();
