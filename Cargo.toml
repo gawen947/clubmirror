@@ -1,11 +1,12 @@
 [package]
 name = "clubmirror"
+description = "A static website generator that mirrors Strava club events, schedule, calendar feed and routes."
 readme = "README.md"
-authors = ["David Hauweele <david@hauweele.net>"]
 version = "0.1.0"
 license = "BSD-3-Clause"
 repository = "https://github.com/gawen947/clubmirror"
 keywords = ["strava", "cycling", "running", "static-site", "calendar"]
+categories = ["command-line-utilities", "web-programming"]
 edition = "2024"
 
 [profile.release]
