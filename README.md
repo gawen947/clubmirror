@@ -1,5 +1,9 @@
 # clubmirror
 
+[![Crates.io](https://img.shields.io/crates/v/clubmirror)](https://crates.io/crates/clubmirror)
+[![Tests](https://github.com/gawen947/clubmirror/actions/workflows/tests.yml/badge.svg)](https://github.com/gawen947/clubmirror/actions)
+[![License](https://img.shields.io/crates/l/clubmirror)](https://github.com/gawen947/clubmirror/blob/main/LICENSE)
+
 **A static website generator that mirrors Strava club events, schedules, calendar feeds, and routes.**
 
 Strava is a great place to organize group rides and runs, but the events are only visible to people logged in to Strava. clubmirror reads the group events of your club through the Strava API and generates a plain static website from templates: an events page, an `.ics` calendar to subscribe to, and downloadable GPX/TCX routes. 
