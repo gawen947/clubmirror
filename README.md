@@ -26,7 +26,7 @@ If you haven't already, install the Rust toolchain with [rustup](https://rustup.
 No Strava account nor network is needed in order to test. We included a fake sample of events [example/events.json](examples/events.json). The configuration file [examples/config.toml](examples/config.toml) is made to use this sample instead to generate the static website.
 
 ```sh
-git clone https://github.com/gawen947/clubmirror
+cargo install clubmirror
 cd clubmirror
 chmod 600 examples/config.toml
 cargo run -- -c examples/config.toml -v
