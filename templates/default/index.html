@@ -1,0 +1,163 @@
+{#-
+  clubmirror default template. Variables and Tera tips: docs/templates.md
+
+  Members-only events (event.private) are hidden. To show them, replace the next
+  line with:  set shown = events
+-#}
+{% set shown = events | filter(attribute="private", value=false) %}
+<!DOCTYPE html>
+<html lang="en" data-timezone="{{ timezone }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ club_name }} · Events</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <h1>{{ club_name }}</h1>
+            <div class="subtitle">Upcoming rides and events</div>
+        </div>
+    </header>
+
+    <main class="container">
+        {% if shown %}
+        <div class="events-list">
+            {% for event in shown %}
+            {% set dates = event.upcoming_occurrences | length %}
+            <button type="button" class="event-item" data-open="modal-{{ event.id }}">
+                <span class="event-item-title">{{ event.title }}</span>
+                <span class="event-item-date">
+                    {% if dates > 0 %}
+                    <time datetime="{{ event.upcoming_occurrences[0] }}">{{ event.upcoming_occurrences[0] | date(format="%a %d %b %Y, %H:%M", timezone=timezone) }}</time>
+                    {% if dates > 1 %}<span class="more">+{{ dates - 1 }} more</span>{% endif %}
+                    {% else %}
+                    <span class="muted">Date to be confirmed</span>
+                    {% endif %}
+                </span>
+            </button>
+            {% endfor %}
+        </div>
+
+        {% for event in shown %}
+        <div id="modal-{{ event.id }}" class="modal" role="dialog" aria-modal="true" aria-labelledby="title-{{ event.id }}">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="modal-close" data-close aria-label="Close">&times;</button>
+                    <button type="button" class="modal-share" data-share="{{ event.id }}" title="Copy link" aria-label="Copy link">🔗</button>
+                    <h2 class="modal-title" id="title-{{ event.id }}">{{ event.title }}</h2>
+                    {% if event.address | trim %}
+                    <div class="modal-meta"><span>📍 {{ event.address | trim }}</span></div>
+                    {% endif %}
+                </div>
+
+                <div class="modal-details">
+                    {% if event.description | trim %}
+                    <div class="modal-description">
+                        {% set lines = event.description | split(pat="\n") %}
+                        {% for line in lines %}
+                            {% if line | trim %}<p>{{ line | trim }}</p>{% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <ul class="dates">
+                        {% for occurrence in event.upcoming_occurrences %}
+                        <li>📅 <time datetime="{{ occurrence }}">{{ occurrence | date(format="%A %d %B %Y, %H:%M", timezone=timezone) }}</time></li>
+                        {% else %}
+                        <li>📅 <span class="muted">Date to be confirmed</span></li>
+                        {% endfor %}
+                    </ul>
+
+                    <div class="modal-stats">
+                        <!-- Organizer: delete this block to hide athlete names and avatars. -->
+                        <div class="organizer-info">
+                            {% set pic = event.organizing_athlete.profile_medium %}
+                            <div class="avatar">
+                                {% if pic %}
+                                    {% if pic is starting_with(pat="http") or pic is starting_with(pat="data:") %}
+                                    <img src="{{ pic }}" alt="" loading="lazy">
+                                    {% else %}
+                                    <span class="avatar-initial">{{ event.organizing_athlete.firstname | truncate(length=1, end="") | upper }}</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="avatar-initial">{{ event.organizing_athlete.firstname | truncate(length=1, end="") | upper }}</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <div class="organizer-name">{{ event.organizing_athlete.firstname }} {{ event.organizing_athlete.lastname }}</div>
+                                <div class="organizer-label">Organizer</div>
+                            </div>
+                        </div>
+                        <!-- end of organizer block -->
+
+                        <div class="event-badges">
+                            {% if event.activity_type != "Ride" %}<span class="badge badge-info">{{ event.activity_type }}</span>{% endif %}
+                            {% if event.women_only %}<span class="badge badge-info">Women only</span>{% endif %}
+                            {% if event.private %}<span class="badge badge-info">Members only</span>{% endif %}
+                            {# skill_levels is a bit field: 1 = casual, 2 = tempo, 4 = race #}
+                            {% if event.skill_levels is number %}
+                                {% if event.skill_levels in [1, 3, 5, 7] %}<span class="badge badge-skill">Casual</span>{% endif %}
+                                {% if event.skill_levels in [2, 3, 6, 7] %}<span class="badge badge-skill">Tempo</span>{% endif %}
+                                {% if event.skill_levels in [4, 5, 6, 7] %}<span class="badge badge-skill">Race</span>{% endif %}
+                            {% endif %}
+                            {% if event.terrain is number %}
+                                {% if event.terrain == 0 %}<span class="badge badge-terrain">Mostly flat</span>
+                                {% elif event.terrain == 1 %}<span class="badge badge-terrain">Rolling hills</span>
+                                {% elif event.terrain == 2 %}<span class="badge badge-terrain">Killer climbs</span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if event.route_id %}
+                    <div class="route-section">
+                        <div class="route-header">
+                            <h3>Route</h3>
+                            {% if routes_url %}
+                            <div class="download-buttons">
+                                <a href="{{ routes_url }}/{{ event.route_id }}.gpx" download="{{ event.title }}.gpx" class="download-btn">GPX</a>
+                                <a href="{{ routes_url }}/{{ event.route_id }}.tcx" download="{{ event.title }}.tcx" class="download-btn">TCX</a>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% if event.route and event.route.map_urls is defined and event.route.map_urls.retina_url is defined %}
+                        <div class="route-map">
+                            <img src="{{ event.route.map_urls.retina_url }}" alt="Route map" class="route-image" loading="lazy">
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <p class="strava-link-row">
+                        <a class="strava-link" href="https://www.strava.com/clubs/{{ club_id }}/group_events/{{ event.id }}" target="_blank" rel="noopener">View on Strava</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty">
+            <h2>No upcoming events</h2>
+            <p>Check back soon for the next rides.</p>
+        </div>
+        {% endif %}
+
+        {% if calendar_url %}
+        <div class="calendar-download">
+            <a href="{{ calendar_url }}" class="calendar-btn">📅 Add the events to your calendar (.ics)</a>
+        </div>
+        {% endif %}
+
+        <footer class="footer">
+            <p>Generated {{ generated_at }} · {{ shown | length }} event(s)</p>
+            <p><a class="strava-link" href="https://www.strava.com/clubs/{{ club_id }}" target="_blank" rel="noopener">View on Strava</a></p>
+        </footer>
+    </main>
+
+    <div id="share-toast" class="share-toast" role="status" data-text="Link copied!"></div>
+
+    <script src="go.js"></script>
+</body>
+</html>
