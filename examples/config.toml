@@ -1,0 +1,33 @@
+# clubmirror playground: no Strava account, no network.
+#
+# From the repository root:
+#   chmod 600 examples/config.toml        # clubmirror refuses world-readable configs
+#   cargo run -- -c examples/config.toml -v
+#   python3 -m http.server -d public 8000 # then open http://localhost:8000
+#
+# Events are read from examples/events.json instead of the Strava API.
+# The api credentials below are ignored in that mode.
+
+cache_path = ".cache"
+timezone = "Europe/London"
+
+[api]
+client_id = 0
+client_secret = "unused"
+refresh_token = "unused"
+quirk_local_json = "examples/events.json"
+
+[generated]
+calendars_path = "public/calendars"
+calendars_url = "calendars"
+# Routes are not downloaded in local mode, so the GPX/TCX links of the demo are dead.
+routes_url = "routes"
+
+[[club]]
+id = 100001
+template_dir = "templates/default"
+output_dir = "public"
+sort_events = true
+# Try these to see the time window at work (the example dates are fixed):
+# past_days = 14
+# future_days = 60
