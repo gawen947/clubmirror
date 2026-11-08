@@ -4,9 +4,9 @@
     "resource_state": 2,
     "title": "Saturday Social Ride",
     "description": "Easy-paced ride with a café stop halfway ☕\n\nWe regroup at every junction, nobody gets dropped.\n\nMeet at the main entrance, rolling out at 09:15.\n\n📏 60 km · 🐢 ~22 km/h",
-    "club_id": 100001,
+    "club_id": 42,
     "club": {
-      "id": 100001,
+      "id": 42,
       "resource_state": 1,
       "name": "Clubmirror Cycling Club"
     },
@@ -76,9 +76,9 @@
     "resource_state": 2,
     "title": "Tuesday Tempo Intervals",
     "description": "Structured intervals on the flat loop. Bring lights.",
-    "club_id": 100001,
+    "club_id": 42,
     "club": {
-      "id": 100001,
+      "id": 42,
       "resource_state": 1,
       "name": "Clubmirror Cycling Club"
     },
@@ -131,9 +131,9 @@
     "resource_state": 2,
     "title": "Sunday Hill Climb Challenge",
     "description": "Three big climbs, regroup at the top of each.\n\nBring food and a spare tube.",
-    "club_id": 100001,
+    "club_id": 42,
     "club": {
-      "id": 100001,
+      "id": 42,
       "resource_state": 1,
       "name": "Clubmirror Cycling Club"
     },
@@ -181,9 +181,9 @@
     "resource_state": 2,
     "title": "Skills & Safety \"101\" <beginners>",
     "description": "Handling, braking and group riding basics. Tea & biscuits afterwards.\n\n<script>alert('this must be escaped')</script>",
-    "club_id": 100001,
+    "club_id": 42,
     "club": {
-      "id": 100001,
+      "id": 42,
       "resource_state": 1,
       "name": "Clubmirror Cycling Club"
     },
@@ -231,9 +231,9 @@
     "resource_state": 2,
     "title": "Winter Solstice Gravel Social with an Extremely Long Event Title That Keeps Going and Going to Test Wrapping Behaviour in Narrow Layouts",
     "description": "",
-    "club_id": 100001,
+    "club_id": 42,
     "club": {
-      "id": 100001,
+      "id": 42,
       "resource_state": 1,
       "name": "Clubmirror Cycling Club"
     },
@@ -281,9 +281,9 @@
     "resource_state": 2,
     "title": "Thursday Night Run Club",
     "description": "Easy 5 km, all paces welcome. Pub afterwards 🍻",
-    "club_id": 100001,
+    "club_id": 42,
     "club": {
-      "id": 100001,
+      "id": 42,
       "resource_state": 1,
       "name": "Clubmirror Cycling Club"
     },
@@ -332,9 +332,9 @@
     "resource_state": 2,
     "title": "Members-only Committee Ride",
     "description": "Planning the next season.",
-    "club_id": 100001,
+    "club_id": 42,
     "club": {
-      "id": 100001,
+      "id": 42,
       "resource_state": 1,
       "name": "Clubmirror Cycling Club"
     },
@@ -382,9 +382,9 @@
     "resource_state": 2,
     "title": "New Year's Day Reset Ride",
     "description": "Shake off the holidays. Fancy dress optional.",
-    "club_id": 100001,
+    "club_id": 42,
     "club": {
-      "id": 100001,
+      "id": 42,
       "resource_state": 1,
       "name": "Clubmirror Cycling Club"
     },
@@ -451,9 +451,9 @@
     "resource_state": 2,
     "title": "Season Opener (past event)",
     "description": "This one is already over: use it to test past_days.",
-    "club_id": 100001,
+    "club_id": 42,
     "club": {
-      "id": 100001,
+      "id": 42,
       "resource_state": 1,
       "name": "Clubmirror Cycling Club"
     },
@@ -497,13 +497,13 @@
     "start_latlng": null
   },
   {
-    "id": 1000010,
+    "id": 420,
     "resource_state": 2,
     "title": "Autumn Gravel Weekender (date to be confirmed)",
     "description": "Date is not decided yet, watch this space.",
-    "club_id": 100001,
+    "club_id": 42,
     "club": {
-      "id": 100001,
+      "id": 42,
       "resource_state": 1,
       "name": "Clubmirror Cycling Club"
     },

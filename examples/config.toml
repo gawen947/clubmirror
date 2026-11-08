@@ -24,7 +24,7 @@ calendars_url = "calendars"
 routes_url = "routes"
 
 [[club]]
-id = 100001
+id = 42
 template_dir = "templates/default"
 output_dir = "public"
 sort_events = true
