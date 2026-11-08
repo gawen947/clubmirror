@@ -4,7 +4,8 @@ readme = "README.md"
 authors = ["David Hauweele <david@hauweele.net>"]
 version = "0.3.0"
 license = "BSD-3-Clause"
-repository = "git@github.com:gawen947/clubmirror.git"
+repository = "https://github.com/gawen947/clubmirror"
+keywords = ["strava", "cycling", "running", "static-site", "calendar"]
 edition = "2024"
 
 [profile.release]
