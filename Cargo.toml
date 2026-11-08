@@ -2,7 +2,7 @@
 name = "clubmirror"
 readme = "README.md"
 authors = ["David Hauweele <david@hauweele.net>"]
-version = "0.3.0"
+version = "0.1.0"
 license = "BSD-3-Clause"
 repository = "git@github.com:gawen947/clubmirror.git"
 edition = "2024"
