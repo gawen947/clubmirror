@@ -27,6 +27,7 @@ No Strava account nor network is needed in order to test. We included a fake sam
 
 ```sh
 git clone https://github.com/gawen947/clubmirror
+cd clubmirror
 chmod 600 examples/config.toml
 cargo run -- -c examples/config.toml -v
 python3 -m http.server -d public 8000   # open http://localhost:8000
