@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.2](https://github.com/gawen947/clubmirror/compare/v0.1.1...v0.1.2) (2026-11-08)
+
+
+### Bug Fixes
+
+* **ci:** invalid trigger ([954ae11](https://github.com/gawen947/clubmirror/commit/954ae1175c0aa53f4fd78fde3ee2809278668b31))
+* **ci:** invalid workflow name ([002f1fd](https://github.com/gawen947/clubmirror/commit/002f1fd024f52b472f88799f41ff217338d76965))
+* **ci:** trusted publishing to crates.io ([8cea1db](https://github.com/gawen947/clubmirror/commit/8cea1db47d768e1633dca8106da60621f7ddb6ba))
+
 ## [0.1.1](https://github.com/gawen947/clubmirror/compare/v0.1.0...v0.1.1) (2026-11-08)
 
 
