@@ -1,7 +1,7 @@
 # clubmirror
 
 [![Crates.io](https://img.shields.io/crates/v/clubmirror)](https://crates.io/crates/clubmirror)
-[![Tests](https://github.com/gawen947/clubmirror/actions/workflows/release-please.yaml/badge.svg?branch=main)](https://github.com/gawen947/clubmirror/actions/workflows/tests.yaml)
+[![Tests](https://github.com/gawen947/clubmirror/actions/workflows/release-please.yaml/badge.svg?branch=main)](https://github.com/gawen947/clubmirror/actions/workflows/release-please.yaml)
 [![License](https://img.shields.io/crates/l/clubmirror)](https://github.com/gawen947/clubmirror/blob/main/LICENSE)
 
 **A static website generator that mirrors Strava club events, schedules, calendar feeds, and routes.**
@@ -30,7 +30,7 @@ If you haven't already, install the Rust toolchain with [rustup](https://rustup.
 No Strava account nor network is needed in order to test. We included a fake sample of events [example/events.json](examples/events.json). The configuration file [examples/config.toml](examples/config.toml) is made to use this sample instead to generate the static website.
 
 ```sh
-cargo install clubmirror
+git clone https://github.com/gawen947/clubmirror
 cd clubmirror
 chmod 600 examples/config.toml
 cargo run -- -c examples/config.toml -v
@@ -114,7 +114,7 @@ Files with a template extension (`html`, `xml`, `txt`, `md`, ...) are rendered w
 
 ## Roadmap
 
-- Replace the hardcoded quirks by scripted, per-club quirks with [Rhai](https://rhai.rs)).
+- Replace the hardcoded quirks by scripted, per-club quirks with [Rhai](https://rhai.rs).
 - Proper debug options (record and replay the API answer) instead of `quirk_*`.
 - Event filtering options, for example, leaving members-only events out of the calendar.
 - Configurable event duration for the calendar.
