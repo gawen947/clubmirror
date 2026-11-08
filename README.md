@@ -23,7 +23,7 @@ It is meant to be run as a cron script that fetches and renders the data from [T
 
 If you haven't already, install the Rust toolchain with [rustup](https://rustup.rs).
 
-No Strava account nor network is needed in order to test. We included a fake sample of events [](examples/events.json). The configuration file [](examples/config.toml) is made to use this sample instead to generate the static website.
+No Strava account nor network is needed in order to test. We included a fake sample of events [example/events.json](examples/events.json). The configuration file [examples/config.toml](examples/config.toml) is made to use this sample instead to generate the static website.
 
 ```sh
 git clone https://github.com/gawen947/clubmirror
@@ -68,7 +68,7 @@ Strava's developer program and its rules change from time to time: check its [de
 
 The tool is configured with one TOML file, `(/usr/local)/etc/clubmirror/config.toml` or whatever `--config` points to. Since it contains secrets, clubmirror refuses to start unless it is owned by the user running it and with permission `0o600`. 
 
-Start from [](config.toml.sample); every option is documented and can also be found in [](src/config.rs).
+Start from [config.toml.sample](config.toml.sample); every option is documented and can also be found in [src/config.rs](src/config.rs).
 
 Generated files are written with the mode (default `0o644`) and the `user`/`group` of section `[generated]`. Obviously changing the owner requires the right privileges.
 
@@ -91,9 +91,9 @@ Each run costs one API request per club + two per event with a route whose cache
 
 ## Templates
 
-The default theme in [](templates/default) is a single page: a list of events, a detail view for each one (description, dates, organizer, level and terrain, route with map and downloads), and a calendar link. Dates are rendered in the club timezone and localized in the browser. Feel free to adapt it to your needs.
+The default theme in [templates/default](templates/default) is a single page: a list of events, a detail view for each one (description, dates, organizer, level and terrain, route with map and downloads), and a calendar link. Dates are rendered in the club timezone and localized in the browser. Feel free to adapt it to your needs.
 
-Files with a template extension (`html`, `xml`, `txt`, `md`, ...) are rendered with Tera; everything else is copied as is. This default list can be adjusted in the configuration file. The list of variables that can be used in the templates are documented in [](docs/templates.md). 
+Files with a template extension (`html`, `xml`, `txt`, `md`, ...) are rendered with Tera; everything else is copied as is. This default list can be adjusted in the configuration file. The list of variables that can be used in the templates are documented in [docs/templates.md](docs/templates.md).
 
 ## Calendar and routes
 
