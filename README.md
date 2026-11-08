@@ -1,7 +1,7 @@
 # clubmirror
 
 [![Crates.io](https://img.shields.io/crates/v/clubmirror)](https://crates.io/crates/clubmirror)
-[![Tests](https://github.com/gawen947/clubmirror/actions/workflows/tests.yml/badge.svg)](https://github.com/gawen947/clubmirror/actions)
+[![Tests](https://github.com/gawen947/clubmirror/actions/workflows/tests.yaml/badge.svg)](https://github.com/gawen947/clubmirror/actions/workflows/tests.yaml)
 [![License](https://img.shields.io/crates/l/clubmirror)](https://github.com/gawen947/clubmirror/blob/main/LICENSE)
 
 **A static website generator that mirrors Strava club events, schedules, calendar feeds, and routes.**
