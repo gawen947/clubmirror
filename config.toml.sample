@@ -1,43 +1,122 @@
-# clubmirror example configuration.
-# This file holds secrets: chmod 600, owned by the user running clubmirror.
-# Top-level keys must stay above the [tables].
+# clubmirror configuration, with every option documented.
+#
+# Install it as /etc/clubmirror/config.toml (/usr/local/etc/clubmirror/config.toml on FreeBSD)
+# or point to it with `clubmirror --config <path>`.
+#
+# - It holds secrets: it must be owned by the user running clubmirror and not by anyone else (chmod 600).
+# - Top-level keys must stay above the [tables].
+# - Relative paths are relative to the directory clubmirror is started from.
+# - Unknown keys are an error.
+#
+# Options left commented out show their default value; "(unset)" means the feature is off.
 
-# Where tokens are cached (created with mode 700 if missing).
+# Directory for cached state (access token, rotated refresh token).
+# Created with mode 700 if missing; must be owned by the user running clubmirror.
 cache_path = "/var/cache/clubmirror"
 
-# Default timezone for clubs that don't set their own (IANA name).
-timezone = "Europe/Brussels"
+# Default IANA timezone (e.g. "Europe/Brussels"), used by clubs that don't set their own.
+# timezone = "UTC"
 
+
+# Strava API credentials and API-related options.
 [api]
+# Strava application client id.
 client_id = 12345
+
+# Strava application client secret.
 client_secret = "your-strava-client-secret"
+
+# Initial refresh token. If Strava rotates it, the new one is persisted in `cache_path`
+# and takes precedence until you change this value.
 refresh_token = "your-strava-refresh-token"
+
+# Only warn (instead of failing) when the API answers 404.
 # warn_on_404 = false
 
+# Debug: save the last raw API response of group events in this file.
+# log_response_path = (unset)
+# log_response_path = "/tmp/clubmirror-response.json"
+
+# TEMPORARY quirk (will become a proper debug option): read the events from this JSON
+# file instead of asking the API, for every club. Avoids spamming the API. In this mode
+# no token is needed and routes are not downloaded. This is useful to work on the templates.
+# quirk_local_json = (unset)
+# quirk_local_json = "/tmp/events.json"
+
+
+# What and how we generate. The whole section is optional, and so is every option in it.
 [generated]
+# Octal mode of generated files.
 # permissions = 0o644
+
+# Owner of generated files (name or uid). Needs root (or matching ownership) to differ
+# from the current user.
+# user = (unset)
 # user = "www"
+
+# Group of generated files (name or gid).
+# group = (unset)
 # group = "www"
-# Files with these extensions are rendered with Tera, everything else is copied verbatim.
+
+# Template files with one of these extensions are rendered with Tera. Every other file
+# of the template directory (CSS, images, fonts, ...) is copied verbatim.
+# Files and directories whose name starts with `_` are only usable as `extends`/`include`
+# sources and are never written to the output. Dotfiles are ignored.
 # template_extensions = ["html", "htm", "xml", "txt", "md", "json", "rss", "atom", "ics", "webmanifest"]
 
-# Download GPX/TCX routes (disabled if unset), and where the site serves them.
-routes_path = "/var/www/clubmirror/routes"
-routes_url = "https://example.org/routes"
+# Download the routes (GPX/TCX) of events in this directory. Disabled if unset.
+# routes_path = (unset)
+routes_path = "/var/www/mysite/routes"
+
+# Seconds before a downloaded route is downloaded again.
 # routes_ttl = 86400
 
-# Generate <club id>.ics calendars (disabled if unset), and where the site serves them.
-calendars_path = "/var/www/clubmirror/calendars"
+# Public base URL of `routes_path`, given to the templates as `routes_url`.
+# routes_url = (unset)
+routes_url = "https://example.org/routes"
+
+# Write one ICS calendar per club (`<club id>.ics`) in this directory. Disabled if unset.
+# calendars_path = (unset)
+calendars_path = "/var/www/mysite/calendars"
+
+# Public base URL of `calendars_path`, given to the templates as `calendars_url`
+# (and `calendar_url` for the calendar of the club being rendered).
+# calendars_url = (unset)
 calendars_url = "https://example.org/calendars"
 
-[[club]]
-id = 123456
-# name = "My Club"
-template_dir = "/usr/local/share/clubmirror/templates/default"
-output_dir = "/var/www/clubmirror/my-club"
-# timezone = "Europe/Paris"
-past_days = 7
-future_days = 60
-# sort_events = false
+# TEMPORARY quirk (will become a proper debug option): save the resulting events of each
+# club as `<club id>.json` in this directory.
+# quirk_save_json = (unset)
+# quirk_save_json = "/tmp/clubmirror-json"
 
-# More clubs: add more [[club]] tables.
+
+# The clubs to mirror, one [[club]] table each. Add more [[club]] tables for more clubs.
+[[club]]
+# Strava club id.
+id = 123456
+
+# Display name (calendar name, `club_name` in templates). Defaults to the name
+# reported by Strava, or "Club <id>" if the club has no events.
+# name = (unset)
+# name = "My Club"
+
+# Directory containing this club's templates.
+template_dir = "/usr/local/share/clubmirror/templates/default"
+
+# Directory where this club's site is generated.
+output_dir = "/var/www/mysite"
+
+# Timezone of the club; defaults to the global `timezone`.
+# timezone = (unset)
+# timezone = "Europe/Paris"
+
+# Hide events whose last occurrence is older than this many days.
+# past_days = (unset)
+past_days = 7
+
+# Hide events whose first occurrence is more than this many days ahead.
+# future_days = (unset)
+future_days = 60
+
+# TEMPORARY quirk (will be replaced): sort events by their first occurrence.
+# sort_events = false
