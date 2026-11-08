@@ -1,4 +1,5 @@
-name: release-please
+# we call it CI because it's how it will be shown in the README badges.
+name: CI
 on:
   push:
     branches: [main]
