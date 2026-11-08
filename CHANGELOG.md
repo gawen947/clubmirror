@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/gawen947/clubmirror/compare/v0.1.0...v0.1.1) (2026-11-08)
+
+
+### Bug Fixes
+
+* **README:** use correct workflow name for tests ([50f4ba4](https://github.com/gawen947/clubmirror/commit/50f4ba411e1ec7c153fed72e080e79affc0a6137))
+
 ## 0.1.0 (2026-11-08)
 
 
